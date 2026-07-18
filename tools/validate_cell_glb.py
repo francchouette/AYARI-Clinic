@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import struct
 from pathlib import Path
 
@@ -12,7 +13,19 @@ from pathlib import Path
 REQUIRED_MARKERS = {
     "GEO_cell": ("細胞", "cell"),
     "GEO_nucleus": ("核", "cell"),
+    "GEO_chromatin_fiber": ("クロマチン繊維", "dna"),
     "GEO_dna": ("DNA", "dna"),
+}
+
+EXPECTED_MEASURED_GEOMETRY = {
+    "GEO_nucleus": (6928, 15478),
+    "GEO_mitochondria_01": (3188, 5300),
+    "GEO_mitochondria_02": (2896, 5300),
+    "GEO_mitochondria_03": (3210, 5300),
+    "GEO_mitochondria_04": (3058, 5300),
+    "GEO_mitochondria_05": (3110, 5300),
+    "GEO_mitochondria_06": (2976, 5300),
+    "GEO_mitochondria_07": (2974, 5300),
 }
 
 
@@ -57,6 +70,28 @@ def bounds_for_node(document: dict, node: dict) -> tuple[list[float], list[float
     return minimum, maximum
 
 
+def geometry_counts_for_node(document: dict, node: dict) -> tuple[int, int]:
+    vertices = 0
+    triangles = 0
+    for primitive in document["meshes"][node["mesh"]]["primitives"]:
+        vertices += document["accessors"][primitive["attributes"]["POSITION"]]["count"]
+        triangles += document["accessors"][primitive["indices"]]["count"] // 3
+    return vertices, triangles
+
+
+def bounds_distance(
+    first_min: list[float],
+    first_max: list[float],
+    second_min: list[float],
+    second_max: list[float],
+) -> float:
+    squared = 0.0
+    for index in range(3):
+        gap = max(first_min[index] - second_max[index], second_min[index] - first_max[index], 0.0)
+        squared += gap * gap
+    return math.sqrt(squared)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("asset", type=Path)
@@ -80,8 +115,15 @@ def main() -> int:
         assert name in names, name
         assert names[name]["extras"]["labelJa"] == label_ja
         assert names[name]["extras"]["markerKey"] == marker_key
+    for node in document["nodes"]:
+        if node["name"].startswith("GEO_"):
+            assert node["extras"].get("labelJa"), node["name"]
+            assert node["extras"].get("markerKey") in {"cell", "mito", "telo", "dna"}, node["name"]
 
-    assert names["GEO_cell"]["extras"]["measured"] is False
+    assert names["GEO_cell"]["extras"]["measured"] is True
+    assert names["GEO_cell"]["extras"]["sourceCellMaskLabel"] == "masks/foreground"
+    assert names["GEO_cell"]["extras"]["sourcePlasmaMembraneLabel"] == "pm_seg"
+    assert names["GEO_cell"]["extras"]["sourcePlasmaMembraneInstanceId"] == 2
     assert names["GEO_nucleus"]["extras"]["measured"] is True
     assert names["GEO_nucleus"]["extras"]["sourceDataset"] == "jrc_hela-2"
     assert len(document["meshes"][names["GEO_nucleus"]["mesh"]]["primitives"]) == 2
@@ -97,27 +139,49 @@ def main() -> int:
         assert node["extras"]["sourceDataset"] == "jrc_hela-2"
         assert isinstance(node["extras"]["sourceInstanceId"], int)
         assert len(document["meshes"][node["mesh"]]["primitives"]) == 2
+    for name, expected_counts in EXPECTED_MEASURED_GEOMETRY.items():
+        assert geometry_counts_for_node(document, names[name]) == expected_counts, name
     for node in chromosomes:
         assert node["extras"]["labelJa"] == "染色体"
         assert node["extras"]["markerKey"] == "telo"
         assert node["extras"]["measured"] is False
         assert node["extras"]["geometryProvenance"] == "educational overlay"
+        assert "interphase" in node["extras"]["biologyNote"]
     for node in telomeres:
         assert node["extras"]["labelJa"] == "テロメア"
         assert node["extras"]["markerKey"] == "telo"
         assert node["extras"]["measured"] is False
+        assert node["extras"]["repeatSequence"] == "TTAGGG"
 
     # Four protective caps must map to each chromosome.
     for chromosome_index in range(1, 5):
         mapped = [node for node in telomeres if node["extras"]["chromosomeIndex"] == chromosome_index]
         assert len(mapped) == 4, (chromosome_index, len(mapped))
         assert {node["extras"]["armTip"] for node in mapped} == {1, 2, 3, 4}
+        chromosome_min, chromosome_max = bounds_for_node(document, chromosomes[chromosome_index - 1])
+        for node in mapped:
+            telomere_min, telomere_max = bounds_for_node(document, node)
+            assert bounds_distance(chromosome_min, chromosome_max, telomere_min, telomere_max) < 0.002
+
+    nucleosomes = [names[f"GEO_nucleosome_{index:02d}"] for index in range(1, 4)]
+    chromatin_fiber = names["GEO_chromatin_fiber"]
+    assert chromatin_fiber["extras"]["markerKey"] == "dna"
+    assert chromatin_fiber["extras"]["connectedChromosome"] == "GEO_chromosome_01"
+    for node in nucleosomes:
+        assert node["extras"]["labelJa"] == "ヌクレオソーム"
+        assert node["extras"]["markerKey"] == "dna"
+        assert node["extras"]["histoneSubunits"] == 8
+        assert node["extras"]["dnaWrapTurns"] == 1.65
+        assert len(document["meshes"][node["mesh"]]["primitives"]) == 2
 
     dna_mesh = document["meshes"][names["GEO_dna"]["mesh"]]
     assert len(dna_mesh["primitives"]) == 3  # strand A, strand B, base-pair rungs
     assert names["GEO_dna"]["extras"]["turns"] == 2.2
     assert names["GEO_dna"]["extras"]["basePairRungs"] == 24
     assert names["GEO_dna"]["extras"]["measured"] is False
+    assert names["GEO_dna"]["extras"]["handedness"] == "right"
+    assert names["GEO_dna"]["extras"]["connectedChromosome"] == "GEO_chromosome_01"
+    assert names["GEO_dna"]["extras"]["biologyNote"] == "No free cytoplasmic DNA; DNA resides in the nucleus."
 
     # All transforms are intentionally baked; geometry nodes carry no TRS or matrix.
     for node in document["nodes"]:
@@ -134,16 +198,31 @@ def main() -> int:
 
     cell_min, cell_max = bounds_for_node(document, names["GEO_cell"])
     assert abs(cell_min[0] + 1.0) < 0.01 and abs(cell_max[0] - 1.0) < 0.01
-    assert abs(cell_min[1] + 0.92) < 0.01 and abs(cell_max[1] - 0.92) < 0.01
+    # Marching-cubes interpolation and surface smoothing can extend the measured
+    # boundary by less than one source voxel beyond the 1.84 m target envelope.
+    assert -0.95 <= cell_min[1] <= -0.90 and 0.90 <= cell_max[1] <= 0.95
     nucleus_min, nucleus_max = bounds_for_node(document, names["GEO_nucleus"])
     nucleus_centre_x = (nucleus_min[0] + nucleus_max[0]) / 2
     nucleus_diameter_x = nucleus_max[0] - nucleus_min[0]
     assert abs(nucleus_centre_x + 0.35) < 0.005
     assert abs(nucleus_diameter_x - 0.60) < 0.005
     dna_min, dna_max = bounds_for_node(document, names["GEO_dna"])
-    assert 1.08 <= dna_max[1] - dna_min[1] <= 1.14
-    assert dna_max[0] >= 0.92  # near the requested x≈+0.95 right-front placement
-    assert dna_min[2] > 0.15
+    assert all(dna_min[index] <= nucleus_max[index] and dna_max[index] >= nucleus_min[index] for index in range(3))
+    dna_centre = [(minimum + maximum) * 0.5 for minimum, maximum in zip(dna_min, dna_max)]
+    assert -0.30 <= dna_centre[0] <= -0.15
+    assert -0.02 <= dna_centre[1] <= 0.15
+    assert 0.08 <= dna_centre[2] <= 0.22
+    chromosome_01_min, chromosome_01_max = bounds_for_node(document, chromosomes[0])
+    root = names["GEO_dna"]["extras"]["rootAnchorMetresXYZ"]
+    root_min = root_max = [float(value) for value in root]
+    assert bounds_distance(root_min, root_max, chromosome_01_min, chromosome_01_max) <= 0.10
+    assert report["structuralQA"]["dnaIntersectsNucleusBounds"] is True
+    assert report["structuralQA"]["dnaRootToChromosome01NearestVertexMetres"] <= 0.10
+    assert report["structuralQA"]["dnaRootDistanceAsCellDiameterFraction"] <= 0.05
+    assert report["structuralQA"]["measuredNucleusAndMitochondriaGeometryLocked"] is True
+    fiber_min, fiber_max = bounds_for_node(document, chromatin_fiber)
+    assert bounds_distance(fiber_min, fiber_max, chromosome_01_min, chromosome_01_max) < 0.005
+    assert bounds_distance(fiber_min, fiber_max, dna_min, dna_max) < 0.005
 
     for material in document["materials"]:
         assert "pbrMetallicRoughness" in material
@@ -163,7 +242,7 @@ def main() -> int:
         "triangles": triangles,
         "meshes": len(document["meshes"]),
         "fileSizeBytes": file_size,
-        "counts": {"mitochondria": len(mitochondria), "chromosomes": len(chromosomes), "telomeres": len(telomeres), "dna": 1},
+        "counts": {"mitochondria": len(mitochondria), "chromosomes": len(chromosomes), "telomeres": len(telomeres), "nucleosomes": len(nucleosomes), "dna": 1},
         "cellBoundsMetres": {"min": cell_min, "max": cell_max},
         "dnaBoundsMetres": {"min": dna_min, "max": dna_max},
         "lightsBaked": False,

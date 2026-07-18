@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Build the AYARI reference-driven medical-luxury cutaway cell GLB.
 
-The nucleus and mitochondrial morphologies are extracted from measured
-OpenOrganelle ``jrc_hela-2`` FIB-SEM segmentation labels.  The display cell
-envelope and chromosome/telomere/DNA teaching overlays remain intentionally
-modelled.  Per-node extras make that distinction machine-readable.
+The cell membrane, nucleus, and mitochondrial morphologies are extracted from
+measured OpenOrganelle ``jrc_hela-2`` FIB-SEM segmentation labels.  The
+chromosome/telomere/DNA teaching overlays remain intentionally modelled.
+Per-node extras make that distinction machine-readable.
 
 The generated asset is self-contained glTF 2.0 Binary with metre-scale Y-up
 geometry. All transforms are baked into vertex positions so viewer-side
@@ -26,6 +26,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from scipy import ndimage
 from skimage import measure
+from skimage.segmentation import watershed
 import trimesh
 
 
@@ -368,32 +369,143 @@ def chromosome(
     return concatenate(arms), endpoints
 
 
+def curve_frames(points: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return stable right-handed transverse frames along a sampled curve."""
+    points = np.asarray(points, dtype=float)
+    tangents = np.empty_like(points)
+    tangents[0] = points[1] - points[0]
+    tangents[-1] = points[-1] - points[-2]
+    tangents[1:-1] = points[2:] - points[:-2]
+    tangents = normalize(tangents)
+    normals = np.empty_like(points)
+    reference = np.array((0.0, 1.0, 0.0))
+    if abs(float(np.dot(tangents[0], reference))) > 0.9:
+        reference = np.array((1.0, 0.0, 0.0))
+    normals[0] = normalize(np.cross(tangents[0], reference))
+    for index in range(1, len(points)):
+        projected = normals[index - 1] - tangents[index] * np.dot(
+            normals[index - 1], tangents[index]
+        )
+        if np.linalg.norm(projected) < 1e-8:
+            reference = (
+                np.array((1.0, 0.0, 0.0))
+                if abs(tangents[index, 0]) < 0.9
+                else np.array((0.0, 0.0, 1.0))
+            )
+            projected = np.cross(tangents[index], reference)
+        normals[index] = normalize(projected)
+    binormals = normalize(np.cross(tangents, normals))
+    return tangents, normals, binormals
+
+
 def dna_helix(
-    height: float = 1.10,
     turns: float = 2.2,
-    centre_x: float = 0.87,
-    centre_z: float = 0.26,
-) -> tuple[Geometry, Geometry, Geometry]:
-    strand_a: list[list[float]] = []
-    strand_b: list[list[float]] = []
-    samples = 126
-    helix_radius = 0.062
-    for index in range(samples):
-        t = index / (samples - 1)
-        y = (t - 0.5) * height
-        # Arc inward at the top and bottom to remain inside the 2 m cell envelope.
-        axis_x = centre_x - 0.25 * (2 * abs(t - 0.5)) ** 1.7
-        angle = math.tau * turns * t
-        strand_a.append([axis_x + helix_radius * math.cos(angle), y, centre_z + helix_radius * math.sin(angle)])
-        strand_b.append([axis_x - helix_radius * math.cos(angle), y, centre_z - helix_radius * math.sin(angle)])
-    geometry_a = tube(strand_a, 0.012, radial_segments=10, caps=True)
-    geometry_b = tube(strand_b, 0.012, radial_segments=10, caps=True)
+    root: Sequence[float] = (-0.31, 0.16, -0.03),
+    tip: Sequence[float] = (-0.17, -0.11, 0.24),
+) -> tuple[Geometry, Geometry, Geometry, np.ndarray]:
+    """Right-handed B-DNA teaching inset emerging from chromosome 01.
+
+    The two backbones use an asymmetric phase separation to make the major and
+    minor groove widths readable.  Dimensions are deliberately enlarged; the
+    biological 2 nm diameter is retained as metadata rather than display scale.
+    """
+    samples = 112
+    t = np.linspace(0.0, 1.0, samples)
+    root_array = np.asarray(root, dtype=float)
+    tip_array = np.asarray(tip, dtype=float)
+    control = np.array((-0.235, 0.045, 0.145), dtype=float)
+    axis = (
+        ((1.0 - t) ** 2)[:, None] * root_array
+        + (2.0 * (1.0 - t) * t)[:, None] * control
+        + (t**2)[:, None] * tip_array
+    )
+    _tangents, normal, binormal = curve_frames(axis)
+    helix_radius = 0.043
+    groove_phase = 2.42  # asymmetric backbone separation suggests major/minor grooves
+    angle_a = math.tau * turns * t
+    angle_b = angle_a + groove_phase
+    strand_a = axis + helix_radius * (
+        normal * np.cos(angle_a)[:, None] + binormal * np.sin(angle_a)[:, None]
+    )
+    strand_b = axis + helix_radius * (
+        normal * np.cos(angle_b)[:, None] + binormal * np.sin(angle_b)[:, None]
+    )
+    geometry_a = tube(strand_a, 0.008, radial_segments=10, caps=True)
+    geometry_b = tube(strand_b, 0.008, radial_segments=10, caps=True)
 
     rungs: list[Geometry] = []
     for rung_index in range(24):
         sample = round(rung_index * (samples - 1) / 23)
-        rungs.append(tube((strand_a[sample], strand_b[sample]), 0.007, radial_segments=8, caps=True))
-    return geometry_a, geometry_b, concatenate(rungs)
+        rungs.append(
+            tube((strand_a[sample], strand_b[sample]), 0.0048, radial_segments=8, caps=True)
+        )
+    return geometry_a, geometry_b, concatenate(rungs), strand_a[0]
+
+
+def coiled_chromatin_path(
+    start: Sequence[float],
+    end: Sequence[float],
+    *,
+    samples: int = 64,
+    turns: float = 1.35,
+) -> np.ndarray:
+    """Simplified 30 nm-equivalent fibre joining chromosome and DNA inset."""
+    start_array = np.asarray(start, dtype=float)
+    end_array = np.asarray(end, dtype=float)
+    axis = end_array - start_array
+    tangent = normalize(axis)
+    reference = np.array((0.0, 1.0, 0.0))
+    if abs(float(np.dot(tangent, reference))) > 0.9:
+        reference = np.array((1.0, 0.0, 0.0))
+    normal = normalize(np.cross(tangent, reference))
+    binormal = normalize(np.cross(tangent, normal))
+    points: list[np.ndarray] = []
+    for index in range(samples):
+        t = index / (samples - 1)
+        envelope = math.sin(math.pi * t)
+        angle = math.tau * turns * t
+        coil = 0.006 * envelope * (normal * math.cos(angle) + binormal * math.sin(angle))
+        points.append(start_array * (1.0 - t) + end_array * t + coil)
+    return np.asarray(points)
+
+
+def nucleosome(
+    centre: Sequence[float],
+    tangent: Sequence[float],
+) -> tuple[Geometry, Geometry]:
+    """Simplified histone octamer with DNA wrapped approximately 1.65 turns."""
+    centre_array = np.asarray(centre, dtype=float)
+    tangent_array = normalize(np.asarray(tangent, dtype=float))
+    reference = np.array((0.0, 1.0, 0.0))
+    if abs(float(np.dot(tangent_array, reference))) > 0.9:
+        reference = np.array((1.0, 0.0, 0.0))
+    normal = normalize(np.cross(tangent_array, reference))
+    binormal = normalize(np.cross(tangent_array, normal))
+
+    lobes: list[Geometry] = []
+    for layer in (-1.0, 1.0):
+        for around in range(4):
+            angle = math.tau * around / 4 + (0.22 if layer > 0 else 0.0)
+            position = (
+                centre_array
+                + tangent_array * layer * 0.0048
+                + (normal * math.cos(angle) + binormal * math.sin(angle)) * 0.0065
+            )
+            lobes.append(uv_sphere(position, (0.0085, 0.0085, 0.0085), around=12, vertical=8))
+    core = concatenate(lobes)
+
+    wrap_points: list[np.ndarray] = []
+    wrap_samples = 54
+    for index in range(wrap_samples):
+        t = index / (wrap_samples - 1)
+        angle = math.tau * 1.65 * t
+        wrap_points.append(
+            centre_array
+            + tangent_array * ((t - 0.5) * 0.018)
+            + (normal * math.cos(angle) + binormal * math.sin(angle)) * 0.018
+        )
+    wrapped_dna = tube(wrap_points, 0.0032, radial_segments=8, caps=True)
+    return core, wrapped_dna
 
 
 OPENORGANELLE_DOI = "https://doi.org/10.25378/janelia.13108343"
@@ -401,8 +513,12 @@ OPENORGANELLE_DATASET = "jrc_hela-2"
 MEASURED_SPACING_ZYX_NM = np.array((83.84, 64.0, 64.0), dtype=float)
 
 
-def load_measured_volume(cache_dir: Path, label: str) -> tuple[np.ndarray, dict]:
-    path = cache_dir / f"{label}_s4.npz"
+def load_measured_volume(
+    cache_dir: Path,
+    label: str,
+    scale: str = "s4",
+) -> tuple[np.ndarray, dict]:
+    path = cache_dir / f"{label.replace('/', '-')}_{scale}.npz"
     if not path.exists():
         raise FileNotFoundError(
             f"Missing measured label cache {path}. Run "
@@ -421,6 +537,162 @@ def largest_component(mask: np.ndarray) -> np.ndarray:
     sizes = np.bincount(labels.reshape(-1))
     sizes[0] = 0
     return labels == int(np.argmax(sizes))
+
+
+def tracked_cell_mask(cache_dir: Path) -> tuple[np.ndarray, dict]:
+    """Separate the nucleus-bearing HeLa cell from the measured foreground.
+
+    The public foreground mask contains the target cell plus partial neighbours
+    that touch at the basal surface.  Starting from the central nucleus, this
+    routine follows the corresponding 2-D foreground component through the
+    acquisition thickness.  Where a slice joins a neighbour, a seeded watershed
+    preserves the measured foreground boundary while separating the contact.
+    """
+    foreground, foreground_provenance = load_measured_volume(
+        cache_dir, "masks/foreground", scale="s3"
+    )
+    nucleus, _nucleus_provenance = load_measured_volume(cache_dir, "nucleus_seg")
+    foreground_mask = foreground > 0
+
+    nucleus_labels, nucleus_count = ndimage.label(nucleus > 0)
+    if nucleus_count == 0:
+        raise ValueError("Cannot seed cell extraction without a nucleus label")
+    sizes = np.bincount(nucleus_labels.reshape(-1))
+    sizes[0] = 0
+    target_nucleus = int(np.argmax(sizes))
+    centre_full = np.asarray(
+        ndimage.center_of_mass(nucleus_labels == target_nucleus), dtype=float
+    )
+    if foreground_mask.shape != nucleus.shape:
+        raise ValueError("foreground s3 and nucleus s4 must share the same grid")
+    centre = np.clip(
+        np.rint(centre_full).astype(int), 0, np.asarray(foreground_mask.shape) - 1
+    )
+    seed_y = int(centre[1])
+    seed_zx = (int(centre[0]), int(centre[2]))
+
+    target = np.zeros_like(foreground_mask)
+    initial_labels, _ = ndimage.label(foreground_mask[:, seed_y, :])
+    initial_id = int(initial_labels[seed_zx])
+    if initial_id == 0:
+        raise ValueError("Central nucleus does not intersect the measured foreground mask")
+    target[:, seed_y, :] = initial_labels == initial_id
+
+    def follow_slice(measured_slice: np.ndarray, previous: np.ndarray) -> np.ndarray:
+        labels, _ = ndimage.label(measured_slice)
+        overlapping = np.unique(labels[previous])
+        overlapping = overlapping[overlapping > 0]
+        candidate = np.isin(labels, overlapping) if len(overlapping) else np.zeros_like(measured_slice)
+        touches_acquisition_edge = bool(
+            candidate.any()
+            and (
+                candidate[0].any()
+                or candidate[-1].any()
+                or candidate[:, 0].any()
+                or candidate[:, -1].any()
+            )
+        )
+        size_limit = max(float(previous.sum()) * 1.6, float(previous.sum()) + 2500.0)
+        if candidate.any() and not touches_acquisition_edge and candidate.sum() < size_limit:
+            return candidate
+
+        distance = ndimage.distance_transform_edt(measured_slice, sampling=(83.84, 64.0))
+        markers = np.zeros(measured_slice.shape, dtype=np.int32)
+        core = ndimage.binary_erosion(previous, iterations=2)
+        if not core.any():
+            core = previous
+        markers[core & measured_slice] = 1
+        markers[measured_slice & ~ndimage.binary_dilation(previous, iterations=18)] = 2
+        if not np.any(markers == 2):
+            boundary = np.zeros_like(measured_slice)
+            boundary[[0, -1], :] = True
+            boundary[:, [0, -1]] = True
+            markers[boundary & measured_slice] = 2
+        if not np.any(markers == 1):
+            previous_positions = np.argwhere(previous)
+            if not len(previous_positions):
+                raise ValueError("Lost the target cell while following measured slices")
+            markers[tuple(previous_positions[len(previous_positions) // 2])] = 1
+        separated = watershed(
+            -distance,
+            markers,
+            mask=measured_slice,
+            connectivity=1,
+            watershed_line=True,
+        )
+        return separated == 1
+
+    previous = target[:, seed_y, :]
+    for y in range(seed_y - 1, -1, -1):
+        previous = follow_slice(foreground_mask[:, y, :], previous)
+        target[:, y, :] = previous
+    previous = target[:, seed_y, :]
+    for y in range(seed_y + 1, foreground_mask.shape[1]):
+        previous = follow_slice(foreground_mask[:, y, :], previous)
+        target[:, y, :] = previous
+
+    target = ndimage.binary_closing(target, structure=np.ones((3, 3, 3), dtype=bool))
+    target &= foreground_mask
+    provenance = dict(foreground_provenance)
+    provenance.update(
+        {
+            "targetCellSelection": "central-nucleus-seeded component tracking with contact watershed",
+            "targetNucleusCentreZYX": centre.astype(int).tolist(),
+            "targetCellVoxels": int(target.sum()),
+            "targetCellBoundsZYX": [
+                np.argwhere(target).min(axis=0).astype(int).tolist(),
+                np.argwhere(target).max(axis=0).astype(int).tolist(),
+            ],
+        }
+    )
+    return target, provenance
+
+
+def measured_membrane_mask(
+    cache_dir: Path,
+    *,
+    cutaway_degrees: float = 108.0,
+) -> tuple[np.ndarray, dict]:
+    target, provenance = tracked_cell_mask(cache_dir)
+    plasma_membrane, pm_provenance = load_measured_volume(cache_dir, "pm_seg")
+    if plasma_membrane.shape != target.shape:
+        raise ValueError("pm_seg s4 and foreground s3 must share the same grid")
+    plasma_membrane_instance_id = 2
+    pm_measured = plasma_membrane == plasma_membrane_instance_id
+    boundary = target & ~ndimage.binary_erosion(target, iterations=1)
+    pm_near_boundary = pm_measured & ndimage.binary_dilation(boundary, iterations=2)
+    membrane = boundary | (ndimage.binary_dilation(pm_near_boundary, iterations=1) & target)
+
+    occupied = np.argwhere(target)
+    minimum = occupied.min(axis=0)
+    maximum = occupied.max(axis=0)
+    centre = (minimum + maximum) * 0.5
+    target_extents = np.array((2.0, 1.84, 1.72), dtype=float)
+    # Coordinates are Z/Y/X; use the future display normalization when cutting
+    # the viewing wedge so the opening stays centred on display-space +Z.
+    display_z = (np.arange(target.shape[0]) - centre[0]) * (
+        target_extents[2] / max(float(maximum[0] - minimum[0]), 1.0)
+    )
+    display_x = (np.arange(target.shape[2]) - centre[2]) * (
+        target_extents[0] / max(float(maximum[2] - minimum[2]), 1.0)
+    )
+    z_grid, x_grid = np.meshgrid(display_z, display_x, indexing="ij")
+    wedge = (z_grid > 0.0) & (
+        np.abs(np.arctan2(x_grid, z_grid)) < math.radians(cutaway_degrees * 0.5)
+    )
+    membrane &= ~wedge[:, None, :]
+    provenance.update(
+        {
+            "plasmaMembraneLabel": pm_provenance["label"],
+            "plasmaMembraneSource": pm_provenance["source"],
+            "cellMaskScale": "s3",
+            "plasmaMembraneScale": "s4",
+            "plasmaMembraneInstanceId": plasma_membrane_instance_id,
+            "cutawayDegrees": cutaway_degrees,
+            "membraneVoxels": int(membrane.sum()),
+        }
+    )
+    return membrane, provenance
 
 
 def measured_surface(
@@ -497,6 +769,26 @@ def measured_nucleus_transform(
         vertices = (np.asarray(geometry.vertices, dtype=float) - centre) * scale + np.asarray(translation)
         transformed.append(clean_geometry(vertices, geometry.faces))
     return transformed
+
+
+def measured_cell_transform(
+    geometry: Geometry,
+    *,
+    target_extents: Sequence[float] = (2.0, 1.84, 1.72),
+    source_bounds_zyx: Sequence[Sequence[int]] | None = None,
+    spacing_zyx_nm: Sequence[float] = (83.84, 64.0, 64.0),
+) -> Geometry:
+    vertices = np.asarray(geometry.vertices, dtype=float)
+    if source_bounds_zyx is None:
+        minimum = vertices.min(axis=0)
+        maximum = vertices.max(axis=0)
+    else:
+        bounds = np.asarray(source_bounds_zyx, dtype=float) * np.asarray(spacing_zyx_nm)
+        minimum = bounds[0, (2, 1, 0)]
+        maximum = bounds[1, (2, 1, 0)]
+    centre = (minimum + maximum) * 0.5
+    scale = np.asarray(target_extents, dtype=float) / np.maximum(maximum - minimum, 1e-9)
+    return clean_geometry((vertices - centre) * scale, geometry.faces)
 
 
 def material(
@@ -664,6 +956,7 @@ class GLBBuilder:
                     "sourceLicense": "CC BY 4.0",
                     "sourceVoxelResolutionNm": [4.0, 4.0, 5.24],
                     "meshSamplingResolutionNmXYZ": [64.0, 64.0, 83.84],
+                    "cellMembraneSamplingResolutionNmXYZ": [64.0, 64.0, 83.84],
                     "provenancePolicy": "Each node declares measured or educational-overlay geometry in extras.",
                 },
             },
@@ -801,10 +1094,22 @@ def main() -> int:
         material("MAT_dna_strand_b", (0.71, 0.79, 0.80, 1.0), 0.10, 0.24, ior=1.44),
         material("MAT_dna_base_pairs", (0.82, 0.70, 0.49, 0.96), 0.18, 0.24, ior=1.48),
         material("MAT_measured_chromatin", (0.67, 0.60, 0.55, 0.30), 0.06, 0.34, transmission=0.35, ior=1.42, thickness=0.018, attenuation=(0.77, 0.72, 0.68)),
+        material("MAT_histone_octamer", (0.76, 0.62, 0.48, 1.0), 0.14, 0.30, ior=1.46),
+        material("MAT_chromatin_fiber", (0.82, 0.78, 0.68, 1.0), 0.10, 0.28, ior=1.46),
     ]
     builder = GLBBuilder()
 
-    cell = cutaway_shell(around=144, vertical=76)
+    membrane_mask, membrane_provenance = measured_membrane_mask(args.cache_dir)
+    cell_measured = measured_surface(
+        membrane_mask,
+        target_faces=44_000,
+        spacing_zyx_nm=(83.84, 64.0, 64.0),
+        smooth_sigma=0.82,
+    )
+    cell = measured_cell_transform(
+        cell_measured,
+        source_bounds_zyx=membrane_provenance["targetCellBoundsZYX"],
+    )
     builder.add_node(
         "GEO_cell",
         ((cell, 0),),
@@ -813,10 +1118,20 @@ def main() -> int:
             "markerKey": "cell",
             "category": "cell membrane",
             "cutaway": True,
-            "geometryProvenance": "modelled display envelope",
-            "measured": False,
-            "referenceDataset": OPENORGANELLE_DATASET,
-            "representationNote": "Envelope is a display-space cutaway; measured morphology is used for the nucleus and mitochondria.",
+            "geometryProvenance": "measured foreground boundary refined with plasma-membrane segmentation",
+            "measured": True,
+            "sourceDataset": OPENORGANELLE_DATASET,
+            "sourceDoi": OPENORGANELLE_DOI,
+            "sourceCellMaskLabel": membrane_provenance["label"],
+            "sourcePlasmaMembraneLabel": membrane_provenance["plasmaMembraneLabel"],
+            "sourcePlasmaMembraneInstanceId": membrane_provenance["plasmaMembraneInstanceId"],
+            "sourceCellMaskScale": "s3",
+            "sourcePlasmaMembraneScale": "s4",
+            "sourceSamplingNmXYZ": [64.0, 64.0, 83.84],
+            "targetCellSelection": membrane_provenance["targetCellSelection"],
+            "cutawayDegrees": membrane_provenance["cutawayDegrees"],
+            "displayTransform": "non-uniformly normalized to requested 2.00 × 1.84 × 1.72 m display envelope",
+            "representationNote": "Acquisition-space target-cell surface with neighbour contacts separated by a nucleus-seeded watershed.",
         },
     )
 
@@ -856,9 +1171,16 @@ def main() -> int:
         ((-0.275, -0.095, -0.095), 0.072, 0.18, 3.0),
     )
     telomere_index = 1
+    chromosome_01_arm_anchor: np.ndarray | None = None
+    chromosome_01_body: Geometry | None = None
     for chromosome_index, (centre, scale, rz, phase) in enumerate(chromosome_configs, start=1):
         rotation = rotation_matrix(0.08 * math.sin(phase), 0.08 * math.cos(phase), rz)
         body, endpoints = chromosome(centre, scale, rotation, phase)
+        if chromosome_index == 1:
+            chromosome_01_body = body
+            chromosome_01_arm_anchor = np.asarray(centre, dtype=float) + 0.78 * (
+                endpoints[1] - np.asarray(centre, dtype=float)
+            )
         builder.add_node(
             f"GEO_chromosome_{chromosome_index:02d}",
             ((body, 2),),
@@ -869,7 +1191,7 @@ def main() -> int:
                 "chromosomeIndex": chromosome_index,
                 "measured": False,
                 "geometryProvenance": "educational overlay",
-                "biologyNote": "Condensed X-shape is a teaching symbol and is not measured in this interphase HeLa dataset.",
+                "biologyNote": "Condensed metaphase X-shape is a teaching symbol; the measured interphase HeLa nucleus contains decondensed chromatin instead.",
             },
         )
         for arm_index, endpoint in enumerate(endpoints, start=1):
@@ -885,22 +1207,96 @@ def main() -> int:
                     "armTip": arm_index,
                     "measured": False,
                     "geometryProvenance": "educational overlay",
+                    "repeatSequence": "TTAGGG",
+                    "biologyNote": "Protective telomeric repeat cap at one metaphase chromosome arm tip; four modeled ends per X-shaped chromosome.",
                 },
             )
             telomere_index += 1
+
+    if chromosome_01_arm_anchor is None or chromosome_01_body is None:
+        raise RuntimeError("Chromosome 01 anchor was not generated")
+    strand_a, strand_b, rungs, dna_root = dna_helix()
+    dna_root_to_chromosome_01 = float(
+        np.min(
+            np.linalg.norm(
+                np.asarray(chromosome_01_body.vertices, dtype=float) - dna_root,
+                axis=1,
+            )
+        )
+    )
+    chromatin_path = coiled_chromatin_path(chromosome_01_arm_anchor, dna_root)
+    chromatin_fiber = tube(chromatin_path, 0.0038, radial_segments=8, caps=True)
+    builder.add_node(
+        "GEO_chromatin_fiber",
+        ((chromatin_fiber, 11),),
+        {
+            "labelJa": "クロマチン繊維",
+            "markerKey": "dna",
+            "category": "chromatin packaging transition",
+            "connectedChromosome": "GEO_chromosome_01",
+            "measured": False,
+            "geometryProvenance": "educational packaging hierarchy overlay",
+            "biologicalDiameterNm": 30.0,
+            "representationNote": "Simplified coiled transition from chromosome 01 through nucleosomes to the magnified DNA inset.",
+        },
+    )
+    nucleosome_names: list[str] = []
+    for nucleosome_index, sample in enumerate((16, 32, 48), start=1):
+        tangent = chromatin_path[sample + 1] - chromatin_path[sample - 1]
+        core, wrapped_dna = nucleosome(chromatin_path[sample], tangent)
+        name = f"GEO_nucleosome_{nucleosome_index:02d}"
+        nucleosome_names.append(name)
+        builder.add_node(
+            name,
+            ((core, 10), (wrapped_dna, 6)),
+            {
+                "labelJa": "ヌクレオソーム",
+                "markerKey": "dna",
+                "category": "nucleosome",
+                "instance": nucleosome_index,
+                "measured": False,
+                "geometryProvenance": "educational packaging hierarchy overlay",
+                "histoneSubunits": 8,
+                "dnaWrapTurns": 1.65,
+                "biologicalDiameterNm": 11.0,
+                "representationNote": "Simplified histone octamer with DNA wrapped approximately 1.65 turns.",
+            },
+        )
+    builder.add_node(
+        "GEO_dna",
+        ((strand_a, 6), (strand_b, 7), (rungs, 8)),
+        {
+            "labelJa": "DNA",
+            "markerKey": "dna",
+            "category": "DNA double helix",
+            "turns": 2.2,
+            "basePairRungs": 24,
+            "handedness": "right",
+            "grooves": ["major", "minor"],
+            "biologicalDiameterNm": 2.0,
+            "connectedChromosome": "GEO_chromosome_01",
+            "rootAnchorMetresXYZ": np.asarray(dna_root, dtype=float).tolist(),
+            "placement": "inside nucleus / at cutaway front, continuous with GEO_chromosome_01",
+            "measured": False,
+            "geometryProvenance": "educational molecular-scale overlay",
+            "representationNote": "magnified inset of nuclear DNA; packaging hierarchy DNA→nucleosome→chromatin→chromosome",
+            "biologyNote": "No free cytoplasmic DNA; DNA resides in the nucleus.",
+            "scaleNote": "DNA is intentionally enlarged and is not at the same physical scale as the cell surface.",
+        },
+    )
 
     mito_volume, mito_provenance = load_measured_volume(args.cache_dir, "mito_seg")
     mito_membrane_volume, mito_membrane_provenance = load_measured_volume(args.cache_dir, "mito-mem_seg")
     # Seven sizeable, well-resolved source instances.  Each outer body and its
     # membrane/cristae label receives exactly the same display transform.
     mito_configs = (
-        (109, (-0.59, 0.57, -0.12), 0.72, (0.02, -0.10, -0.12)),
-        (351, (0.18, 0.64, -0.16), 0.70, (0.08, 0.15, 0.28)),
-        (253, (-0.72, 0.12, -0.10), 0.66, (-0.12, 0.10, 1.24)),
-        (99, (-0.57, -0.52, -0.14), 0.70, (0.06, -0.12, -0.26)),
-        (385, (0.03, -0.68, -0.10), 0.76, (-0.05, 0.08, 0.12)),
-        (277, (0.48, -0.38, -0.11), 0.68, (0.10, -0.08, 0.77)),
-        (169, (0.35, 0.22, -0.26), 0.67, (-0.08, 0.12, -0.72)),
+        (109, (-0.35, 0.55, -0.12), 0.72, (0.02, -0.10, -0.12)),
+        (351, (0.20, 0.58, -0.16), 0.70, (0.08, 0.15, 0.28)),
+        (253, (-0.63, 0.22, -0.10), 0.66, (-0.12, 0.10, 1.24)),
+        (99, (-0.52, -0.34, -0.14), 0.70, (0.06, -0.12, -0.26)),
+        (385, (-0.03, -0.50, -0.10), 0.76, (-0.05, 0.08, 0.12)),
+        (277, (0.40, -0.30, -0.11), 0.68, (0.10, -0.08, 0.77)),
+        (169, (0.36, 0.17, -0.26), 0.67, (-0.08, 0.12, -0.72)),
     )
     for index, (source_instance, centre, length, angles) in enumerate(mito_configs, start=1):
         body_measured = measured_surface(
@@ -938,23 +1334,6 @@ def main() -> int:
             },
         )
 
-    strand_a, strand_b, rungs = dna_helix()
-    builder.add_node(
-        "GEO_dna",
-        ((strand_a, 6), (strand_b, 7), (rungs, 8)),
-        {
-            "labelJa": "DNA",
-            "markerKey": "dna",
-            "category": "DNA double helix",
-            "turns": 2.2,
-            "basePairRungs": 24,
-            "placement": "right-front of nucleus",
-            "measured": False,
-            "geometryProvenance": "educational molecular-scale overlay",
-            "scaleNote": "DNA is intentionally enlarged and is not at the same physical scale as the cell surface.",
-        },
-    )
-
     builder.write(args.output, materials)
     from render_cell_preview import render as render_cell_preview
 
@@ -966,6 +1345,14 @@ def main() -> int:
 
     all_min = np.min([node["boundsMetres"]["min"] for node in builder.report_nodes], axis=0)
     all_max = np.max([node["boundsMetres"]["max"] for node in builder.report_nodes], axis=0)
+    component_lookup = {node["name"]: node for node in builder.report_nodes}
+    nucleus_bounds = component_lookup["GEO_nucleus"]["boundsMetres"]
+    dna_bounds = component_lookup["GEO_dna"]["boundsMetres"]
+    dna_nucleus_bounds_intersect = all(
+        dna_bounds["min"][index] <= nucleus_bounds["max"][index]
+        and dna_bounds["max"][index] >= nucleus_bounds["min"][index]
+        for index in range(3)
+    )
     report = {
         "asset": Path(os.path.relpath(args.output, Path.cwd())).as_posix(),
         "format": "glTF 2.0 Binary",
@@ -978,12 +1365,18 @@ def main() -> int:
         "boundsMetres": {"min": all_min.astype(float).tolist(), "max": all_max.astype(float).tolist()},
         "fileSizeBytes": args.output.stat().st_size,
         "components": builder.report_nodes,
-        "counts": {"mitochondria": 7, "chromosomes": 4, "telomeres": 16, "dnaDoubleHelices": 1},
+        "counts": {"mitochondria": 7, "chromosomes": 4, "telomeres": 16, "nucleosomes": 3, "dnaDoubleHelices": 1},
         "viewerKeys": {
             "cell": ["GEO_cell", "GEO_nucleus"],
             "mito": [f"GEO_mitochondria_{index:02d}" for index in range(1, 8)],
             "telo": [f"GEO_chromosome_{index:02d}" for index in range(1, 5)] + [f"GEO_telomere_{index:02d}" for index in range(1, 17)],
-            "dna": ["GEO_dna"],
+            "dna": ["GEO_chromatin_fiber"] + nucleosome_names + ["GEO_dna"],
+        },
+        "structuralQA": {
+            "dnaIntersectsNucleusBounds": dna_nucleus_bounds_intersect,
+            "dnaRootToChromosome01NearestVertexMetres": dna_root_to_chromosome_01,
+            "dnaRootDistanceAsCellDiameterFraction": dna_root_to_chromosome_01 / 2.0,
+            "measuredNucleusAndMitochondriaGeometryLocked": True,
         },
         "sceneContent": {"background": False, "lights": False, "cameras": False, "animations": False, "skins": False},
         "sourceData": {
@@ -994,8 +1387,11 @@ def main() -> int:
             "license": "CC BY 4.0",
             "nativeVoxelResolutionNmXYZ": [4.0, 4.0, 5.24],
             "meshSamplingResolutionNmXYZ": [64.0, 64.0, 83.84],
-            "measuredNodes": ["GEO_nucleus"] + [f"GEO_mitochondria_{index:02d}" for index in range(1, 8)],
-            "modelledNodes": ["GEO_cell"] + [f"GEO_chromosome_{index:02d}" for index in range(1, 5)] + [f"GEO_telomere_{index:02d}" for index in range(1, 17)] + ["GEO_dna"],
+            "measuredCellMembraneSamplingNmXYZ": [64.0, 64.0, 83.84],
+            "measuredCellMembraneLabels": ["masks/foreground", "pm_seg"],
+            "measuredCellMembranePlasmaMembraneInstanceId": 2,
+            "measuredNodes": ["GEO_cell", "GEO_nucleus"] + [f"GEO_mitochondria_{index:02d}" for index in range(1, 8)],
+            "modelledNodes": [f"GEO_chromosome_{index:02d}" for index in range(1, 5)] + [f"GEO_telomere_{index:02d}" for index in range(1, 17)] + ["GEO_chromatin_fiber"] + nucleosome_names + ["GEO_dna"],
             "displayNormalization": "Measured surfaces are normalized and compositionally repositioned to satisfy the requested 2 m display-space layout.",
         },
         "scientificScope": "Measured cell-organelle morphology with clearly identified educational overlays; not a single-scale literal reconstruction.",

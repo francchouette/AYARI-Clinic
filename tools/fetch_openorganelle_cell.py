@@ -2,9 +2,9 @@
 """Fetch selected jrc_hela-2 N5 label volumes from Janelia OpenOrganelle.
 
 The public source dataset is the automatic organelle segmentation of the
-wild-type interphase HeLa cell ``jrc_hela-2``.  Only the coarse ``s4`` level
-is used for the Web GLB build; it samples the measured FIB-SEM labels at
-64 x 64 x 83.84 nm and keeps the generated asset tractable.
+wild-type interphase HeLa cell ``jrc_hela-2``.  The Web GLB uses the cell
+foreground at ``s3`` and plasma-membrane/organelle labels at ``s4``.  These
+volumes share a 64 x 64 x 83.84 nm grid and keep the generated asset tractable.
 
 Source DOI: https://doi.org/10.25378/janelia.13108343
 License: CC BY 4.0
@@ -30,6 +30,8 @@ import numpy as np
 BUCKET = "https://janelia-cosem-datasets.s3.us-east-1.amazonaws.com"
 DATASET = "jrc_hela-2"
 DEFAULT_LABELS = (
+    "masks/foreground",
+    "pm_seg",
     "nucleus_seg",
     "chrom_seg",
     "mito_seg",
@@ -164,7 +166,11 @@ def fetch_volume(label: str, scale: str, workers: int) -> tuple[np.ndarray, dict
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", type=Path, default=Path(".cache/openorganelle/jrc_hela-2"))
-    parser.add_argument("--scale", default="s4")
+    parser.add_argument(
+        "--scale",
+        default=None,
+        help="Override N5 scale for every label; defaults to foreground s3 and organelle labels s4",
+    )
     parser.add_argument("--labels", nargs="+", default=list(DEFAULT_LABELS))
     parser.add_argument("--workers", type=int, default=20)
     parser.add_argument("--force", action="store_true")
@@ -173,15 +179,16 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     manifest: dict[str, dict] = {}
     for label in args.labels:
+        scale = args.scale or ("s3" if label == "masks/foreground" else "s4")
         file_label = label.replace("/", "-")
-        output = args.output_dir / f"{file_label}_{args.scale}.npz"
+        output = args.output_dir / f"{file_label}_{scale}.npz"
         if output.exists() and not args.force:
             with np.load(output, allow_pickle=False) as archive:
                 volume = archive["volume"]
                 provenance = json.loads(str(archive["provenance"].item()))
             print(f"{label}: cached {list(volume.shape)} {volume.dtype}")
         else:
-            volume, provenance = fetch_volume(label, args.scale, args.workers)
+            volume, provenance = fetch_volume(label, scale, args.workers)
             np.savez_compressed(output, volume=volume, provenance=json.dumps(provenance, separators=(",", ":")))
             print(f"{label}: wrote {output} ({output.stat().st_size:,} bytes)")
         manifest[label] = provenance

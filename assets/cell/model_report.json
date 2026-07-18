@@ -7,10 +7,10 @@
     "origin": "cell centre",
     "transformsApplied": true
   },
-  "triangles": 114414,
-  "vertices": 59544,
-  "meshes": 30,
-  "nodes": 32,
+  "triangles": 121729,
+  "vertices": 64950,
+  "meshes": 34,
+  "nodes": 36,
   "materials": [
     "MAT_cell_glass",
     "MAT_nucleus_glass",
@@ -21,40 +21,42 @@
     "MAT_dna_strand_a",
     "MAT_dna_strand_b",
     "MAT_dna_base_pairs",
-    "MAT_measured_chromatin"
+    "MAT_measured_chromatin",
+    "MAT_histone_octamer",
+    "MAT_chromatin_fiber"
   ],
   "boundsMetres": {
     "min": [
-      -0.9996938705444336,
-      -0.9200000166893005,
-      -0.8597097396850586
+      -1.0019463300704956,
+      -0.9342824220657349,
+      -0.863353431224823
     ],
     "max": [
-      0.9996938705444336,
-      0.9200000166893005,
-      0.5053844451904297
+      1.001969337463379,
+      0.9339520931243896,
+      0.6487548351287842
     ]
   },
-  "fileSizeBytes": 2856832,
+  "fileSizeBytes": 3090576,
   "components": [
     {
       "name": "GEO_cell",
       "labelJa": "細胞",
       "markerKey": "cell",
-      "measured": false,
-      "geometryProvenance": "modelled display envelope",
-      "vertices": 21888,
-      "triangles": 43772,
+      "measured": true,
+      "geometryProvenance": "measured foreground boundary refined with plasma-membrane segmentation",
+      "vertices": 23694,
+      "triangles": 43999,
       "boundsMetres": {
         "min": [
-          -0.9996938705444336,
-          -0.9200000166893005,
-          -0.8597097396850586
+          -1.0019463300704956,
+          -0.9342824220657349,
+          -0.863353431224823
         ],
         "max": [
-          0.9996938705444336,
-          0.9200000166893005,
-          0.5053844451904297
+          1.001969337463379,
+          0.9339520931243896,
+          0.6487548351287842
         ]
       }
     },
@@ -500,6 +502,111 @@
       }
     },
     {
+      "name": "GEO_chromatin_fiber",
+      "labelJa": "クロマチン繊維",
+      "markerKey": "dna",
+      "measured": false,
+      "geometryProvenance": "educational packaging hierarchy overlay",
+      "vertices": 514,
+      "triangles": 1024,
+      "boundsMetres": {
+        "min": [
+          -0.40462762117385864,
+          0.15512703359127045,
+          -0.10814177244901657
+        ],
+        "max": [
+          -0.3460753858089447,
+          0.1728975921869278,
+          -0.011568040587008
+        ]
+      }
+    },
+    {
+      "name": "GEO_nucleosome_01",
+      "labelJa": "ヌクレオソーム",
+      "markerKey": "dna",
+      "measured": false,
+      "geometryProvenance": "educational packaging hierarchy overlay",
+      "vertices": 1122,
+      "triangles": 2208,
+      "boundsMetres": {
+        "min": [
+          -0.40789785981178284,
+          0.14071232080459595,
+          -0.10320378839969635
+        ],
+        "max": [
+          -0.36530232429504395,
+          0.183054119348526,
+          -0.06655833125114441
+        ]
+      }
+    },
+    {
+      "name": "GEO_nucleosome_02",
+      "labelJa": "ヌクレオソーム",
+      "markerKey": "dna",
+      "measured": false,
+      "geometryProvenance": "educational packaging hierarchy overlay",
+      "vertices": 1122,
+      "triangles": 2208,
+      "boundsMetres": {
+        "min": [
+          -0.39455875754356384,
+          0.14744579792022705,
+          -0.07394225150346756
+        ],
+        "max": [
+          -0.35095080733299255,
+          0.19009676575660706,
+          -0.04603586718440056
+        ]
+      }
+    },
+    {
+      "name": "GEO_nucleosome_03",
+      "labelJa": "ヌクレオソーム",
+      "markerKey": "dna",
+      "measured": false,
+      "geometryProvenance": "educational packaging hierarchy overlay",
+      "vertices": 1122,
+      "triangles": 2208,
+      "boundsMetres": {
+        "min": [
+          -0.3880968689918518,
+          0.13939781486988068,
+          -0.052028704434633255
+        ],
+        "max": [
+          -0.3431030213832855,
+          0.18132153153419495,
+          -0.01702248305082321
+        ]
+      }
+    },
+    {
+      "name": "GEO_dna",
+      "labelJa": "DNA",
+      "markerKey": "dna",
+      "measured": false,
+      "geometryProvenance": "educational molecular-scale overlay",
+      "vertices": 2676,
+      "triangles": 5248,
+      "boundsMetres": {
+        "min": [
+          -0.35709521174430847,
+          -0.14194783568382263,
+          -0.06270883977413177
+        ],
+        "max": [
+          -0.12212035059928894,
+          0.16904637217521667,
+          0.25433996319770813
+        ]
+      }
+    },
+    {
       "name": "GEO_mitochondria_01",
       "labelJa": "ミトコンドリア",
       "markerKey": "mito",
@@ -509,13 +616,13 @@
       "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.9550925493240356,
-          0.4680122137069702,
+          -0.7150925397872925,
+          0.44801223278045654,
           -0.19119881093502045
         ],
         "max": [
-          -0.24154415726661682,
-          0.6931074857711792,
+          -0.0015441525029018521,
+          0.6731074452400208,
           -0.06476914882659912
         ]
       }
@@ -530,13 +637,13 @@
       "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.13411004841327667,
-          0.43147748708724976,
+          -0.11411004513502121,
+          0.37147748470306396,
           -0.29155224561691284
         ],
         "max": [
-          0.5307751297950745,
-          0.7727547883987427,
+          0.5507751107215881,
+          0.7127547860145569,
           -0.058650992810726166
         ]
       }
@@ -551,13 +658,13 @@
       "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.931602954864502,
-          -0.1575547754764557,
+          -0.8416029810905457,
+          -0.057554781436920166,
           -0.18328647315502167
         ],
         "max": [
-          -0.5534629225730896,
-          0.4543837904930115,
+          -0.4634629189968109,
+          0.5543838143348694,
           0.025664757937192917
         ]
       }
@@ -572,13 +679,13 @@
       "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.9066993594169617,
-          -0.6411622762680054,
+          -0.8566994071006775,
+          -0.4611622989177704,
           -0.18951381742954254
         ],
         "max": [
-          -0.2332531064748764,
-          -0.38769710063934326,
+          -0.18325310945510864,
+          -0.20769710838794708,
           -0.022248459979891777
         ]
       }
@@ -593,13 +700,13 @@
       "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.35385647416114807,
-          -0.757841944694519,
+          -0.4138564467430115,
+          -0.5778419375419617,
           -0.1972060352563858
         ],
         "max": [
-          0.39672327041625977,
-          -0.5244841575622559,
+          0.336723268032074,
+          -0.3444841504096985,
           -0.04025070369243622
         ]
       }
@@ -614,13 +721,13 @@
       "triangles": 5300,
       "boundsMetres": {
         "min": [
-          0.1334700733423233,
-          -0.71210116147995,
+          0.053470075130462646,
+          -0.6321011185646057,
           -0.3055632412433624
         ],
         "max": [
-          0.8318876028060913,
-          -0.04880622774362564,
+          0.7518875598907471,
+          0.031193774193525314,
           0.07614748179912567
         ]
       }
@@ -635,35 +742,14 @@
       "triangles": 5300,
       "boundsMetres": {
         "min": [
-          0.06932611763477325,
-          -0.04763124883174896,
+          0.07932611554861069,
+          -0.09763125330209732,
           -0.3927094638347626
         ],
         "max": [
-          0.6108664274215698,
-          0.48609820008277893,
+          0.6208664178848267,
+          0.43609818816185,
           -0.15911361575126648
-        ]
-      }
-    },
-    {
-      "name": "GEO_dna",
-      "labelJa": "DNA",
-      "markerKey": "dna",
-      "measured": false,
-      "geometryProvenance": "educational molecular-scale overlay",
-      "vertices": 2956,
-      "triangles": 5808,
-      "boundsMetres": {
-        "min": [
-          0.5478978157043457,
-          -0.5585259795188904,
-          0.1860179752111435
-        ],
-        "max": [
-          0.9400566816329956,
-          0.5600154399871826,
-          0.33386746048927307
         ]
       }
     }
@@ -672,6 +758,7 @@
     "mitochondria": 7,
     "chromosomes": 4,
     "telomeres": 16,
+    "nucleosomes": 3,
     "dnaDoubleHelices": 1
   },
   "viewerKeys": {
@@ -711,8 +798,18 @@
       "GEO_telomere_16"
     ],
     "dna": [
+      "GEO_chromatin_fiber",
+      "GEO_nucleosome_01",
+      "GEO_nucleosome_02",
+      "GEO_nucleosome_03",
       "GEO_dna"
     ]
+  },
+  "structuralQA": {
+    "dnaIntersectsNucleusBounds": true,
+    "dnaRootToChromosome01NearestVertexMetres": 0.08863803346415211,
+    "dnaRootDistanceAsCellDiameterFraction": 0.044319016732076055,
+    "measuredNucleusAndMitochondriaGeometryLocked": true
   },
   "sceneContent": {
     "background": false,
@@ -737,7 +834,18 @@
       64.0,
       83.84
     ],
+    "measuredCellMembraneSamplingNmXYZ": [
+      64.0,
+      64.0,
+      83.84
+    ],
+    "measuredCellMembraneLabels": [
+      "masks/foreground",
+      "pm_seg"
+    ],
+    "measuredCellMembranePlasmaMembraneInstanceId": 2,
     "measuredNodes": [
+      "GEO_cell",
       "GEO_nucleus",
       "GEO_mitochondria_01",
       "GEO_mitochondria_02",
@@ -748,7 +856,6 @@
       "GEO_mitochondria_07"
     ],
     "modelledNodes": [
-      "GEO_cell",
       "GEO_chromosome_01",
       "GEO_chromosome_02",
       "GEO_chromosome_03",
@@ -769,6 +876,10 @@
       "GEO_telomere_14",
       "GEO_telomere_15",
       "GEO_telomere_16",
+      "GEO_chromatin_fiber",
+      "GEO_nucleosome_01",
+      "GEO_nucleosome_02",
+      "GEO_nucleosome_03",
       "GEO_dna"
     ],
     "displayNormalization": "Measured surfaces are normalized and compositionally repositioned to satisfy the requested 2 m display-space layout."

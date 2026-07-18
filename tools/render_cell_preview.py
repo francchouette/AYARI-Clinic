@@ -13,7 +13,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 
 MATERIAL_STYLE = {
-    "MAT_cell_glass": ((0.62, 0.78, 0.80), 0.055),
+    "MAT_cell_glass": ((0.62, 0.78, 0.80), 0.075),
     "MAT_nucleus_glass": ((0.74, 0.80, 0.77), 0.12),
     "MAT_measured_chromatin": ((0.66, 0.53, 0.43), 0.08),
     "MAT_chromosome_pearl": ((0.91, 0.88, 0.78), 0.92),
@@ -23,6 +23,8 @@ MATERIAL_STYLE = {
     "MAT_dna_strand_a": ((0.91, 0.91, 0.84), 0.96),
     "MAT_dna_strand_b": ((0.57, 0.75, 0.77), 0.96),
     "MAT_dna_base_pairs": ((0.88, 0.68, 0.35), 0.92),
+    "MAT_histone_octamer": ((0.82, 0.61, 0.42), 0.98),
+    "MAT_chromatin_fiber": ((0.88, 0.83, 0.69), 0.98),
 }
 
 
@@ -77,7 +79,7 @@ def render(asset: Path, output: Path, triangles: int | None = None) -> None:
         collection = Poly3DCollection(
             plot_triangles,
             facecolors=facecolors,
-            edgecolors=(0.79, 0.66, 0.43, 0.018 if mat == "MAT_cell_glass" else 0.0),
+            edgecolors=(0.79, 0.66, 0.43, 0.026 if mat == "MAT_cell_glass" else 0.0),
             linewidths=0.05,
             zsort="average",
         )
@@ -100,7 +102,7 @@ def render(asset: Path, output: Path, triangles: int | None = None) -> None:
     fig.text(
         0.057,
         0.905,
-        "Measured FIB-SEM nucleus, chromatin, mitochondria and membrane/cristae · jrc_hela-2",
+        "Measured FIB-SEM membrane and organelles · connected nuclear DNA packaging inset · jrc_hela-2",
         color="#aeb9b8",
         fontsize=9.5,
         ha="left",

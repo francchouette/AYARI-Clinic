@@ -2,7 +2,7 @@
 
 ![AYARI cell preview](preview.png)
 
-AYARI Clinicの指標可視化向けに制作した、医療ラグジュアリー調の細胞カットアウェイモデルです。核、核内クロマチン、7個のミトコンドリア外形と膜／クリステは、Janelia OpenOrganelle `jrc_hela-2` の実測FIB-SEMセグメンテーションから表面抽出しています。GLB本体に背景・ライト・カメラは含めず、ビューア側で金色 `#c9a96e` のリムライトや選択発光を追加する前提です。
+AYARI Clinicの指標可視化向けに制作した、医療ラグジュアリー調の細胞カットアウェイモデルです。細胞膜、核、核内クロマチン、7個のミトコンドリア外形と膜／クリステは、Janelia OpenOrganelle `jrc_hela-2` の実測FIB-SEMセグメンテーションから表面抽出しています。GLB本体に背景・ライト・カメラは含めず、ビューア側で金色 `#c9a96e` のリムライトや選択発光を追加する前提です。
 
 ## 納品アセット
 
@@ -19,17 +19,17 @@ AYARI Clinicの指標可視化向けに制作した、医療ラグジュアリ�
 | 項目 | 仕様 |
 |---|---|
 | フォーマット | glTF 2.0 Binary（`.glb`） |
-| 三角形 | 114,414 |
-| 頂点 | 59,544 |
-| ファイルサイズ | 約2.86 MB |
-| メッシュ | 30（複数primitiveを含む） |
+| 三角形 | 121,729 |
+| 頂点 | 64,950 |
+| ファイルサイズ | 約3.09 MB |
+| メッシュ | 34（複数primitiveを含む） |
 | 単位・軸 | メートル、Y-up、右手系 |
 | 原点 | 細胞中心 `(0, 0, 0)` |
-| 外殻 | 約2.0 m幅、正面 `+Z` 側カットアウェイ |
+| 細胞膜 | 実測表面、約2.0 m幅、正面 `+Z` 側カットアウェイ |
 | 核 | 実測表面、中心 `x=-0.35 m`、幅約0.6 m、実測クロマチンprimitive |
 | ミトコンドリア | 実測7個、各個体に同一source IDの膜／クリステprimitive |
 | 染色体・テロメア | 4染色体、各4末端、計16テロメア |
-| DNA | 高さ約1.1 m、2.2回転、24本の横木 |
+| DNA | 核前面の右巻き拡大インセット、2.2回転、24本の横木 |
 | UV・テクスチャ | なし。単色PBRマテリアル |
 | リグ・アニメーション | なし |
 | 背景・ライト・カメラ | なし |
@@ -46,6 +46,8 @@ AYARI_Cell_Cutaway
     ├── GEO_mitochondria_01 ... 07       markerKey: mito
     ├── GEO_chromosome_01 ... 04         markerKey: telo
     ├── GEO_telomere_01 ... 16           markerKey: telo
+    ├── GEO_chromatin_fiber               markerKey: dna
+    ├── GEO_nucleosome_01 ... 03          markerKey: dna
     └── GEO_dna                          markerKey: dna
 ```
 
@@ -61,20 +63,20 @@ AYARI_Cell_Cutaway
 }
 ```
 
-`GEO_nucleus` は実測核外形と実測クロマチンの2 primitive、`GEO_mitochondria_XX` は実測外形と同一個体IDの膜／クリステの2 primitive、`GEO_dna` は2本の鎖と横木の3 primitiveです。同一部位としてまとめて発光・ズームできる一方、PBR材は内部要素ごとに分離されています。
+`GEO_cell` は実測foreground境界をplasma-membrane labelで補強したカットアウェイ表面です。`GEO_nucleus` は実測核外形と実測クロマチンの2 primitive、`GEO_mitochondria_XX` は実測外形と同一個体IDの膜／クリステの2 primitiveです。DNA関連は `GEO_chromosome_01` の腕から `GEO_chromatin_fiber` → 3個の `GEO_nucleosome_XX` → `GEO_dna` へ連続する拡大インセットで、`GEO_dna` 自体は2本の鎖と横木の3 primitiveです。同一部位としてまとめて発光・ズームできる一方、PBR材は内部要素ごとに分離されています。
 
 ## 実測データと教育用オーバーレイ
 
-実測ソースは、wild-type interphase HeLa cellをFIB-SEMで取得したJanelia OpenOrganelle `jrc_hela-2`（native `4 × 4 × 5.24 nm/voxel`、CC BY 4.0）です。Web用メッシュは公開N5の`s4` labelから生成しています。詳細な取得元、source label、表示空間への正規化、帰属表記は[`SOURCE_DATA.md`](SOURCE_DATA.md)を参照してください。
+実測ソースは、wild-type interphase HeLa cellをFIB-SEMで取得したJanelia OpenOrganelle `jrc_hela-2`（native `4 × 4 × 5.24 nm/voxel`、CC BY 4.0）です。Web用メッシュは、同じ `64 × 64 × 83.84 nm` gridを持つ公開N5の細胞foreground `s3` とplasma-membrane／細胞小器官label `s4` から生成しています。foregroundに接触した隣接細胞は、中央核をseedにしたslice trackingとcontact watershedで分離しています。詳細な取得元、source label、表示空間への正規化、帰属表記は[`SOURCE_DATA.md`](SOURCE_DATA.md)を参照してください。
 
-GLB内では、実測surfaceに `extras.measured: true`、表示用または教育用geometryに `extras.measured: false` と `extras.geometryProvenance` を付与しています。`jrc_hela-2` は間期細胞のため、X型染色体、テロメアキャップ、拡大DNAは同一時点の実測形状とはせず、教育用オーバーレイとして明示しています。
+GLB内では、実測surfaceに `extras.measured: true`、表示用または教育用geometryに `extras.measured: false` と `extras.geometryProvenance` を付与しています。`jrc_hela-2` は間期細胞のため、X型染色体、テロメアキャップ、DNAパッケージング階層は同一時点の実測形状とはせず、教育用オーバーレイとして明示しています。DNAは細胞質に孤立させず、核前面で染色体01へ接続しています。
 
 | markerKey | 対象 |
 |---|---|
 | `cell` | 細胞膜、核 |
 | `mito` | 7個のミトコンドリア |
 | `telo` | 4染色体、16テロメア |
-| `dna` | DNA二重らせん |
+| `dna` | クロマチン繊維、3ヌクレオソーム、DNA二重らせん |
 
 ## Three.jsでの利用
 
@@ -102,7 +104,7 @@ python tools/validate_cell_glb.py \
   --report assets/cell/model_report.json
 ```
 
-生成物はKhronos glTF Validatorでも `0 errors / 0 warnings` を確認済みです。全ノードのtransformは頂点へ適用済みで、geometry nodeにTRSやmatrixは残していません。
+生成物はKhronos glTF Validatorでも `0 errors / 0 warnings` を確認済みです。DNA境界は核境界と交差し、DNA根元から `GEO_chromosome_01` 実頂点までの最近接距離は約 `0.0886 m`（細胞径の約4.43%）です。全ノードのtransformは頂点へ適用済みで、geometry nodeにTRSやmatrixは残していません。
 
 ## 用途制限
 
