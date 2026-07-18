@@ -102,7 +102,7 @@ def render(asset: Path, output: Path, triangles: int | None = None) -> None:
     fig.text(
         0.057,
         0.905,
-        "Measured FIB-SEM membrane and organelles · connected nuclear DNA packaging inset · jrc_hela-2",
+        "Rounded organic cell envelope · measured FIB-SEM organelles · fully contained nuclear DNA · jrc_hela-2",
         color="#aeb9b8",
         fontsize=9.5,
         ha="left",

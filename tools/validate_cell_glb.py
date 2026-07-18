@@ -120,7 +120,10 @@ def main() -> int:
             assert node["extras"].get("labelJa"), node["name"]
             assert node["extras"].get("markerKey") in {"cell", "mito", "telo", "dna"}, node["name"]
 
-    assert names["GEO_cell"]["extras"]["measured"] is True
+    assert names["GEO_cell"]["extras"]["measured"] is False
+    assert names["GEO_cell"]["extras"]["sourceMeasuredReference"] is True
+    assert names["GEO_cell"]["extras"]["shapeModel"] == "low-frequency asymmetric rounded envelope"
+    assert names["GEO_cell"]["extras"]["cutawayDegrees"] == 104.0
     assert names["GEO_cell"]["extras"]["sourceCellMaskLabel"] == "masks/foreground"
     assert names["GEO_cell"]["extras"]["sourcePlasmaMembraneLabel"] == "pm_seg"
     assert names["GEO_cell"]["extras"]["sourcePlasmaMembraneInstanceId"] == 2
@@ -197,32 +200,44 @@ def main() -> int:
     assert 2_000_000 <= file_size <= 6_000_000, file_size
 
     cell_min, cell_max = bounds_for_node(document, names["GEO_cell"])
-    assert abs(cell_min[0] + 1.0) < 0.01 and abs(cell_max[0] - 1.0) < 0.01
-    # Marching-cubes interpolation and surface smoothing can extend the measured
-    # boundary by less than one source voxel beyond the 1.84 m target envelope.
-    assert -0.95 <= cell_min[1] <= -0.90 and 0.90 <= cell_max[1] <= 0.95
+    cell_width = cell_max[0] - cell_min[0]
+    cell_height = cell_max[1] - cell_min[1]
+    assert 1.95 <= cell_width <= 2.10
+    assert 1.84 <= cell_height <= 1.96
+    assert 0.90 <= cell_height / cell_width <= 0.98
     nucleus_min, nucleus_max = bounds_for_node(document, names["GEO_nucleus"])
     nucleus_centre_x = (nucleus_min[0] + nucleus_max[0]) / 2
     nucleus_diameter_x = nucleus_max[0] - nucleus_min[0]
     assert abs(nucleus_centre_x + 0.35) < 0.005
     assert abs(nucleus_diameter_x - 0.60) < 0.005
     dna_min, dna_max = bounds_for_node(document, names["GEO_dna"])
-    assert all(dna_min[index] <= nucleus_max[index] and dna_max[index] >= nucleus_min[index] for index in range(3))
+    assert all(nucleus_min[index] <= dna_min[index] <= dna_max[index] <= nucleus_max[index] for index in range(3))
     dna_centre = [(minimum + maximum) * 0.5 for minimum, maximum in zip(dna_min, dna_max)]
     assert -0.30 <= dna_centre[0] <= -0.15
     assert -0.02 <= dna_centre[1] <= 0.15
-    assert 0.08 <= dna_centre[2] <= 0.22
+    assert -0.12 <= dna_centre[2] <= 0.02
     chromosome_01_min, chromosome_01_max = bounds_for_node(document, chromosomes[0])
     root = names["GEO_dna"]["extras"]["rootAnchorMetresXYZ"]
     root_min = root_max = [float(value) for value in root]
     assert bounds_distance(root_min, root_max, chromosome_01_min, chromosome_01_max) <= 0.10
     assert report["structuralQA"]["dnaIntersectsNucleusBounds"] is True
+    assert report["structuralQA"]["dnaContainedWithinNucleusHull"] is True
+    assert report["structuralQA"]["nuclearPackagingContainedWithinNucleusHull"] is True
+    assert report["structuralQA"]["dnaMaximumNucleusHullPenetrationMetres"] <= 0.0
+    assert report["structuralQA"]["nuclearPackagingMaximumNucleusHullPenetrationMetres"] <= 0.0
     assert report["structuralQA"]["dnaRootToChromosome01NearestVertexMetres"] <= 0.10
     assert report["structuralQA"]["dnaRootDistanceAsCellDiameterFraction"] <= 0.05
     assert report["structuralQA"]["measuredNucleusAndMitochondriaGeometryLocked"] is True
     fiber_min, fiber_max = bounds_for_node(document, chromatin_fiber)
     assert bounds_distance(fiber_min, fiber_max, chromosome_01_min, chromosome_01_max) < 0.005
     assert bounds_distance(fiber_min, fiber_max, dna_min, dna_max) < 0.005
+    for node in [chromatin_fiber, *nucleosomes, names["GEO_dna"]]:
+        packaging_min, packaging_max = bounds_for_node(document, node)
+        assert all(
+            nucleus_min[index] <= packaging_min[index]
+            and packaging_max[index] <= nucleus_max[index]
+            for index in range(3)
+        ), node["name"]
 
     for material in document["materials"]:
         assert "pbrMetallicRoughness" in material

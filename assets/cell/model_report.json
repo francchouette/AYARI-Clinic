@@ -7,8 +7,8 @@
     "origin": "cell centre",
     "transformsApplied": true
   },
-  "triangles": 121729,
-  "vertices": 64950,
+  "triangles": 121502,
+  "vertices": 63144,
   "meshes": 34,
   "nodes": 36,
   "materials": [
@@ -27,36 +27,36 @@
   ],
   "boundsMetres": {
     "min": [
-      -1.0019463300704956,
-      -0.9342824220657349,
-      -0.863353431224823
+      -1.0165516138076782,
+      -0.9544896483421326,
+      -0.9150689244270325
     ],
     "max": [
-      1.001969337463379,
-      0.9339520931243896,
-      0.6487548351287842
+      1.016091227531433,
+      0.9455057978630066,
+      0.5819591283798218
     ]
   },
-  "fileSizeBytes": 3090576,
+  "fileSizeBytes": 3044904,
   "components": [
     {
       "name": "GEO_cell",
       "labelJa": "細胞",
       "markerKey": "cell",
-      "measured": true,
-      "geometryProvenance": "measured foreground boundary refined with plasma-membrane segmentation",
-      "vertices": 23694,
-      "triangles": 43999,
+      "measured": false,
+      "geometryProvenance": "organic display envelope informed by measured foreground and plasma-membrane segmentation",
+      "vertices": 21888,
+      "triangles": 43772,
       "boundsMetres": {
         "min": [
-          -1.0019463300704956,
-          -0.9342824220657349,
-          -0.863353431224823
+          -1.0165516138076782,
+          -0.9544896483421326,
+          -0.9150689244270325
         ],
         "max": [
-          1.001969337463379,
-          0.9339520931243896,
-          0.6487548351287842
+          1.016091227531433,
+          0.9455057978630066,
+          0.5819591283798218
         ]
       }
     },
@@ -511,14 +511,14 @@
       "triangles": 1024,
       "boundsMetres": {
         "min": [
-          -0.40462762117385864,
-          0.15512703359127045,
-          -0.10814177244901657
+          -0.4040393531322479,
+          0.11641239374876022,
+          -0.10961213707923889
         ],
         "max": [
-          -0.3460753858089447,
-          0.1728975921869278,
-          -0.011568040587008
+          -0.33242619037628174,
+          0.17070770263671875,
+          -0.04910210520029068
         ]
       }
     },
@@ -532,14 +532,14 @@
       "triangles": 2208,
       "boundsMetres": {
         "min": [
-          -0.40789785981178284,
-          0.14071232080459595,
-          -0.10320378839969635
+          -0.40239959955215454,
+          0.13072223961353302,
+          -0.11724596470594406
         ],
         "max": [
-          -0.36530232429504395,
-          0.183054119348526,
-          -0.06655833125114441
+          -0.36467111110687256,
+          0.17237934470176697,
+          -0.07493684440851212
         ]
       }
     },
@@ -553,14 +553,14 @@
       "triangles": 2208,
       "boundsMetres": {
         "min": [
-          -0.39455875754356384,
-          0.14744579792022705,
-          -0.07394225150346756
+          -0.3871539235115051,
+          0.12640933692455292,
+          -0.09484177827835083
         ],
         "max": [
-          -0.35095080733299255,
-          0.19009676575660706,
-          -0.04603586718440056
+          -0.3412516117095947,
+          0.16866934299468994,
+          -0.06407675892114639
         ]
       }
     },
@@ -574,14 +574,14 @@
       "triangles": 2208,
       "boundsMetres": {
         "min": [
-          -0.3880968689918518,
-          0.13939781486988068,
-          -0.052028704434633255
+          -0.37534576654434204,
+          0.11151979863643646,
+          -0.08347474783658981
         ],
         "max": [
-          -0.3431030213832855,
-          0.18132153153419495,
-          -0.01702248305082321
+          -0.33106017112731934,
+          0.14712707698345184,
+          -0.04139479249715805
         ]
       }
     },
@@ -595,14 +595,14 @@
       "triangles": 5248,
       "boundsMetres": {
         "min": [
-          -0.35709521174430847,
-          -0.14194783568382263,
-          -0.06270883977413177
+          -0.34493833780288696,
+          -0.10457565635442734,
+          -0.11562560498714447
         ],
         "max": [
-          -0.12212035059928894,
-          0.16904637217521667,
-          0.25433996319770813
+          -0.14485710859298706,
+          0.12389152497053146,
+          -0.003289258573204279
         ]
       }
     },
@@ -807,8 +807,12 @@
   },
   "structuralQA": {
     "dnaIntersectsNucleusBounds": true,
-    "dnaRootToChromosome01NearestVertexMetres": 0.08863803346415211,
-    "dnaRootDistanceAsCellDiameterFraction": 0.044319016732076055,
+    "dnaContainedWithinNucleusHull": true,
+    "nuclearPackagingContainedWithinNucleusHull": true,
+    "dnaMaximumNucleusHullPenetrationMetres": -0.038956677589717145,
+    "nuclearPackagingMaximumNucleusHullPenetrationMetres": -0.038956677589717145,
+    "dnaRootToChromosome01NearestVertexMetres": 0.07798739806391969,
+    "dnaRootDistanceAsCellDiameterFraction": 0.038993699031959844,
     "measuredNucleusAndMitochondriaGeometryLocked": true
   },
   "sceneContent": {
@@ -845,7 +849,6 @@
     ],
     "measuredCellMembranePlasmaMembraneInstanceId": 2,
     "measuredNodes": [
-      "GEO_cell",
       "GEO_nucleus",
       "GEO_mitochondria_01",
       "GEO_mitochondria_02",
@@ -856,6 +859,7 @@
       "GEO_mitochondria_07"
     ],
     "modelledNodes": [
+      "GEO_cell",
       "GEO_chromosome_01",
       "GEO_chromosome_02",
       "GEO_chromosome_03",
@@ -882,7 +886,7 @@
       "GEO_nucleosome_03",
       "GEO_dna"
     ],
-    "displayNormalization": "Measured surfaces are normalized and compositionally repositioned to satisfy the requested 2 m display-space layout."
+    "displayNormalization": "Measured organelle surfaces are normalized and compositionally repositioned; the cell membrane uses a smooth organic display envelope informed by the measured source labels."
   },
   "scientificScope": "Measured cell-organelle morphology with clearly identified educational overlays; not a single-scale literal reconstruction.",
   "medicalUse": "Reference-driven educational visualisation; not validated for diagnosis or surgical planning."

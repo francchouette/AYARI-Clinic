@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Build the AYARI reference-driven medical-luxury cutaway cell GLB.
 
-The cell membrane, nucleus, and mitochondrial morphologies are extracted from
-measured OpenOrganelle ``jrc_hela-2`` FIB-SEM segmentation labels.  The
+The nucleus and mitochondrial morphologies are extracted from measured
+OpenOrganelle ``jrc_hela-2`` FIB-SEM segmentation labels.  The cell membrane is
+a rounded organic display envelope informed by the measured cell labels; the
 chromosome/telomere/DNA teaching overlays remain intentionally modelled.
-Per-node extras make that distinction machine-readable.
+Per-node extras make those distinctions machine-readable.
 
 The generated asset is self-contained glTF 2.0 Binary with metre-scale Y-up
 geometry. All transforms are baked into vertex positions so viewer-side
@@ -25,6 +26,7 @@ from typing import Iterable, Sequence
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from scipy import ndimage
+from scipy.spatial import ConvexHull
 from skimage import measure
 from skimage.segmentation import watershed
 import trimesh
@@ -171,19 +173,35 @@ def uv_sphere(
 
 
 def cutaway_shell(
-    outer_radii: Sequence[float] = (1.0, 0.92, 0.86),
+    outer_radii: Sequence[float] = (0.99, 0.95, 0.91),
     thickness: float = 0.035,
-    gap_radians: float = math.radians(108),
-    around: int = 160,
-    vertical: int = 88,
+    gap_radians: float = math.radians(104),
+    around: int = 144,
+    vertical: int = 76,
 ) -> Geometry:
-    """Closed thin ellipsoid shell with a wedge removed around front (+Z)."""
+    """Closed, softly asymmetric cell shell with a front (+Z) cutaway.
+
+    A low-frequency radial field avoids a mathematically perfect sphere while
+    keeping the silhouette smooth and recognisably cell-like.  This is a
+    display envelope: measured OpenOrganelle labels remain attached as source
+    references, but their culture-dish flattening and contact surfaces are not
+    transferred to the presentation mesh.
+    """
     outer = np.asarray(outer_radii, dtype=float)
     inner = outer - thickness
     phi_start = math.pi / 2 + gap_radians / 2
     phi_end = math.pi / 2 - gap_radians / 2 + math.tau
     epsilon = 1e-4
     vertices: list[list[float]] = []
+
+    def organic_radius(latitude: float, longitude: float) -> float:
+        latitude_weight = math.cos(latitude) ** 2
+        return (
+            1.0
+            + 0.024 * math.sin(2.0 * longitude + 0.45) * latitude_weight
+            + 0.016 * math.cos(3.0 * latitude - 0.30)
+            + 0.011 * math.sin(longitude - 0.80) * math.sin(2.0 * latitude)
+        )
 
     def surface(radii: np.ndarray) -> list[list[int]]:
         grid: list[list[int]] = []
@@ -192,12 +210,13 @@ def cutaway_shell(
             row: list[int] = []
             for longitude in range(around):
                 phi = phi_start + (phi_end - phi_start) * longitude / (around - 1)
+                organic = organic_radius(lat, phi)
                 row.append(len(vertices))
                 vertices.append(
                     [
-                        radii[0] * math.cos(lat) * math.cos(phi),
-                        radii[1] * math.sin(lat),
-                        radii[2] * math.cos(lat) * math.sin(phi),
+                        radii[0] * organic * math.cos(lat) * math.cos(phi),
+                        radii[1] * organic * math.sin(lat),
+                        radii[2] * organic * math.cos(lat) * math.sin(phi),
                     ]
                 )
             grid.append(row)
@@ -400,8 +419,8 @@ def curve_frames(points: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray
 
 def dna_helix(
     turns: float = 2.2,
-    root: Sequence[float] = (-0.31, 0.16, -0.03),
-    tip: Sequence[float] = (-0.17, -0.11, 0.24),
+    root: Sequence[float] = (-0.32, 0.12, -0.08),
+    tip: Sequence[float] = (-0.17, -0.08, -0.04),
 ) -> tuple[Geometry, Geometry, Geometry, np.ndarray]:
     """Right-handed B-DNA teaching inset emerging from chromosome 01.
 
@@ -413,14 +432,14 @@ def dna_helix(
     t = np.linspace(0.0, 1.0, samples)
     root_array = np.asarray(root, dtype=float)
     tip_array = np.asarray(tip, dtype=float)
-    control = np.array((-0.235, 0.045, 0.145), dtype=float)
+    control = np.array((-0.255, 0.035, -0.045), dtype=float)
     axis = (
         ((1.0 - t) ** 2)[:, None] * root_array
         + (2.0 * (1.0 - t) * t)[:, None] * control
         + (t**2)[:, None] * tip_array
     )
     _tangents, normal, binormal = curve_frames(axis)
-    helix_radius = 0.043
+    helix_radius = 0.032
     groove_phase = 2.42  # asymmetric backbone separation suggests major/minor grooves
     angle_a = math.tau * turns * t
     angle_b = angle_a + groove_phase
@@ -430,14 +449,14 @@ def dna_helix(
     strand_b = axis + helix_radius * (
         normal * np.cos(angle_b)[:, None] + binormal * np.sin(angle_b)[:, None]
     )
-    geometry_a = tube(strand_a, 0.008, radial_segments=10, caps=True)
-    geometry_b = tube(strand_b, 0.008, radial_segments=10, caps=True)
+    geometry_a = tube(strand_a, 0.0065, radial_segments=10, caps=True)
+    geometry_b = tube(strand_b, 0.0065, radial_segments=10, caps=True)
 
     rungs: list[Geometry] = []
     for rung_index in range(24):
         sample = round(rung_index * (samples - 1) / 23)
         rungs.append(
-            tube((strand_a[sample], strand_b[sample]), 0.0048, radial_segments=8, caps=True)
+            tube((strand_a[sample], strand_b[sample]), 0.0040, radial_segments=8, caps=True)
         )
     return geometry_a, geometry_b, concatenate(rungs), strand_a[0]
 
@@ -943,7 +962,7 @@ class GLBBuilder:
         gltf = {
             "asset": {
                 "version": "2.0",
-                "generator": "AYARI Clinic OpenOrganelle cell builder 2.0",
+                "generator": "AYARI Clinic OpenOrganelle cell builder 2.1",
                 "copyright": "Copyright AYARI Clinic",
                 "extras": {
                     "units": "metres",
@@ -957,7 +976,7 @@ class GLBBuilder:
                     "sourceVoxelResolutionNm": [4.0, 4.0, 5.24],
                     "meshSamplingResolutionNmXYZ": [64.0, 64.0, 83.84],
                     "cellMembraneSamplingResolutionNmXYZ": [64.0, 64.0, 83.84],
-                    "provenancePolicy": "Each node declares measured or educational-overlay geometry in extras.",
+                    "provenancePolicy": "Each node declares measured, source-informed display, or educational-overlay geometry in extras.",
                 },
             },
             "extensionsUsed": [
@@ -1099,17 +1118,11 @@ def main() -> int:
     ]
     builder = GLBBuilder()
 
-    membrane_mask, membrane_provenance = measured_membrane_mask(args.cache_dir)
-    cell_measured = measured_surface(
-        membrane_mask,
-        target_faces=44_000,
-        spacing_zyx_nm=(83.84, 64.0, 64.0),
-        smooth_sigma=0.82,
+    cell_cutaway_degrees = 104.0
+    _membrane_mask, membrane_provenance = measured_membrane_mask(
+        args.cache_dir, cutaway_degrees=cell_cutaway_degrees
     )
-    cell = measured_cell_transform(
-        cell_measured,
-        source_bounds_zyx=membrane_provenance["targetCellBoundsZYX"],
-    )
+    cell = cutaway_shell(gap_radians=math.radians(cell_cutaway_degrees))
     builder.add_node(
         "GEO_cell",
         ((cell, 0),),
@@ -1118,8 +1131,10 @@ def main() -> int:
             "markerKey": "cell",
             "category": "cell membrane",
             "cutaway": True,
-            "geometryProvenance": "measured foreground boundary refined with plasma-membrane segmentation",
-            "measured": True,
+            "geometryProvenance": "organic display envelope informed by measured foreground and plasma-membrane segmentation",
+            "measured": False,
+            "sourceMeasuredReference": True,
+            "shapeModel": "low-frequency asymmetric rounded envelope",
             "sourceDataset": OPENORGANELLE_DATASET,
             "sourceDoi": OPENORGANELLE_DOI,
             "sourceCellMaskLabel": membrane_provenance["label"],
@@ -1130,8 +1145,8 @@ def main() -> int:
             "sourceSamplingNmXYZ": [64.0, 64.0, 83.84],
             "targetCellSelection": membrane_provenance["targetCellSelection"],
             "cutawayDegrees": membrane_provenance["cutawayDegrees"],
-            "displayTransform": "non-uniformly normalized to requested 2.00 × 1.84 × 1.72 m display envelope",
-            "representationNote": "Acquisition-space target-cell surface with neighbour contacts separated by a nucleus-seeded watershed.",
+            "displayTransform": "rounded organic display envelope, approximately 2 m across",
+            "representationNote": "Smooth asymmetric presentation shell; measured culture-dish flattening and reconstructed neighbour-contact surfaces are intentionally not transferred to the display silhouette.",
         },
     )
 
@@ -1241,9 +1256,11 @@ def main() -> int:
         },
     )
     nucleosome_names: list[str] = []
+    nucleosome_geometries: list[Geometry] = []
     for nucleosome_index, sample in enumerate((16, 32, 48), start=1):
         tangent = chromatin_path[sample + 1] - chromatin_path[sample - 1]
         core, wrapped_dna = nucleosome(chromatin_path[sample], tangent)
+        nucleosome_geometries.extend((core, wrapped_dna))
         name = f"GEO_nucleosome_{nucleosome_index:02d}"
         nucleosome_names.append(name)
         builder.add_node(
@@ -1353,6 +1370,18 @@ def main() -> int:
         and dna_bounds["max"][index] >= nucleus_bounds["min"][index]
         for index in range(3)
     )
+    hull = ConvexHull(np.asarray(nucleus.vertices, dtype=float))
+    hull_normals = hull.equations[:, :3]
+    hull_offsets = hull.equations[:, 3]
+
+    def maximum_hull_penetration(geometries: Sequence[Geometry]) -> float:
+        vertices = np.vstack([np.asarray(geometry.vertices, dtype=float) for geometry in geometries])
+        return float(np.max(vertices @ hull_normals.T + hull_offsets))
+
+    dna_hull_penetration = maximum_hull_penetration((strand_a, strand_b, rungs))
+    packaging_hull_penetration = maximum_hull_penetration(
+        (chromatin_fiber, *nucleosome_geometries, strand_a, strand_b, rungs)
+    )
     report = {
         "asset": Path(os.path.relpath(args.output, Path.cwd())).as_posix(),
         "format": "glTF 2.0 Binary",
@@ -1374,6 +1403,10 @@ def main() -> int:
         },
         "structuralQA": {
             "dnaIntersectsNucleusBounds": dna_nucleus_bounds_intersect,
+            "dnaContainedWithinNucleusHull": dna_hull_penetration <= 1e-6,
+            "nuclearPackagingContainedWithinNucleusHull": packaging_hull_penetration <= 1e-6,
+            "dnaMaximumNucleusHullPenetrationMetres": dna_hull_penetration,
+            "nuclearPackagingMaximumNucleusHullPenetrationMetres": packaging_hull_penetration,
             "dnaRootToChromosome01NearestVertexMetres": dna_root_to_chromosome_01,
             "dnaRootDistanceAsCellDiameterFraction": dna_root_to_chromosome_01 / 2.0,
             "measuredNucleusAndMitochondriaGeometryLocked": True,
@@ -1390,9 +1423,9 @@ def main() -> int:
             "measuredCellMembraneSamplingNmXYZ": [64.0, 64.0, 83.84],
             "measuredCellMembraneLabels": ["masks/foreground", "pm_seg"],
             "measuredCellMembranePlasmaMembraneInstanceId": 2,
-            "measuredNodes": ["GEO_cell", "GEO_nucleus"] + [f"GEO_mitochondria_{index:02d}" for index in range(1, 8)],
-            "modelledNodes": [f"GEO_chromosome_{index:02d}" for index in range(1, 5)] + [f"GEO_telomere_{index:02d}" for index in range(1, 17)] + ["GEO_chromatin_fiber"] + nucleosome_names + ["GEO_dna"],
-            "displayNormalization": "Measured surfaces are normalized and compositionally repositioned to satisfy the requested 2 m display-space layout.",
+            "measuredNodes": ["GEO_nucleus"] + [f"GEO_mitochondria_{index:02d}" for index in range(1, 8)],
+            "modelledNodes": ["GEO_cell"] + [f"GEO_chromosome_{index:02d}" for index in range(1, 5)] + [f"GEO_telomere_{index:02d}" for index in range(1, 17)] + ["GEO_chromatin_fiber"] + nucleosome_names + ["GEO_dna"],
+            "displayNormalization": "Measured organelle surfaces are normalized and compositionally repositioned; the cell membrane uses a smooth organic display envelope informed by the measured source labels.",
         },
         "scientificScope": "Measured cell-organelle morphology with clearly identified educational overlays; not a single-scale literal reconstruction.",
         "medicalUse": "Reference-driven educational visualisation; not validated for diagnosis or surgical planning.",
