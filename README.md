@@ -1,5 +1,7 @@
 # AYARI Clinic Human Anatomy GLB
 
+> 追加アセット: [`assets/cell/ayari_cell_cutaway.glb`](assets/cell/ayari_cell_cutaway.glb) — 指標別発光・ズーム対応の細胞カットアウェイモデル。仕様と実装例は [`assets/cell/README.md`](assets/cell/README.md) を参照してください。
+
 ![AYARI anatomy preview](assets/anatomy/preview.png)
 
 AYARI Clinicのデータ可視化向けに3段階のLODを用意した、成人男性の全身解剖モデルです。骨格・脳・主要臓器は同一のBodyParts3D全身座標から生成しているため、部位を個別に目測配置したモデルではありません。
