@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -61,9 +62,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("asset", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--report", type=Path)
     args = parser.parse_args()
 
     scene = trimesh.load(args.asset, force="scene")
+    triangles = sum(len(mesh.faces) for mesh in scene.geometry.values())
+    profile = "HIGH-RES"
+    if args.report:
+        report = json.loads(args.report.read_text(encoding="utf-8"))
+        triangles = report["triangles"]
+        profile = report.get("profile", {}).get("name", profile).upper()
     fig = plt.figure(figsize=(11.2, 7.2), dpi=160, facecolor="white")
     front = fig.add_subplot(1, 2, 1, projection="3d")
     side = fig.add_subplot(1, 2, 2, projection="3d")
@@ -71,8 +79,15 @@ def main() -> int:
     add_scene(side, scene, 0)
     front.set_title("ANTERIOR", fontsize=10, color="#5d6670", pad=4)
     side.set_title("RIGHT LATERAL", fontsize=10, color="#5d6670", pad=4)
-    fig.suptitle("AYARI HUMAN ANATOMY — MOBILE GLB", fontsize=15, color="#26313a", y=0.97)
-    fig.text(0.5, 0.035, "42k triangles · Y-up · metres · foot-centred origin", ha="center", fontsize=9, color="#7b858e")
+    fig.suptitle("AYARI HUMAN ANATOMY — MULTI-LOD GLB", fontsize=15, color="#26313a", y=0.97)
+    fig.text(
+        0.5,
+        0.035,
+        f"{profile} · {triangles:,} triangles · Y-up · metres · foot-centred origin",
+        ha="center",
+        fontsize=9,
+        color="#7b858e",
+    )
     fig.subplots_adjust(left=0.02, right=0.98, bottom=0.07, top=0.92, wspace=0.0)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.output, bbox_inches="tight", facecolor="white")

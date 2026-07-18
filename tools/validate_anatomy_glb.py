@@ -43,6 +43,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("asset", type=Path)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--max-triangles", type=int, default=50_000)
     args = parser.parse_args()
 
     gltf = GLTF2().load_binary(args.asset)
@@ -56,7 +57,7 @@ def main() -> int:
             assert node.extras and node.extras.get("nodeType") == "locator"
 
     assert gltf.asset.version == "2.0"
-    assert report["triangles"] <= 50_000
+    assert report["triangles"] <= args.max_triangles
     bounds = report["boundsMetres"]
     # Decimation may remove the original lowest skin vertex; allow 5 mm while
     # keeping the coordinate origin itself at the source model's floor.

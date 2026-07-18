@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-export const ANATOMY_URL = '/assets/anatomy/ayari_human_anatomy.glb';
+export const ANATOMY_URLS = {
+  high: '/assets/anatomy/ayari_human_anatomy.glb',
+  standard: '/assets/anatomy/ayari_human_anatomy_lod1_standard.glb',
+  mobile: '/assets/anatomy/ayari_human_anatomy_lod0_mobile.glb',
+};
 
 export function createGoldMarker(radius = 0.009) {
   const material = new THREE.MeshStandardMaterial({
@@ -36,15 +40,20 @@ export function attachMarker(locators, markerKey, marker = createGoldMarker()) {
   return marker;
 }
 
-export async function loadAyariAnatomy(scene) {
+export async function loadAyariAnatomy(scene, profile = 'high') {
+  const url = ANATOMY_URLS[profile];
+  if (!url) {
+    throw new Error(`Unknown anatomy LOD profile: ${profile}`);
+  }
   const loader = new GLTFLoader();
-  const gltf = await loader.loadAsync(ANATOMY_URL);
+  const gltf = await loader.loadAsync(url);
   const model = gltf.scene;
   model.name = 'AYARI_ANATOMY';
   scene.add(model);
 
   return {
     model,
+    profile,
     locators: collectAnatomyLocators(model),
     attachMarker(markerKey, marker) {
       return attachMarker(this.locators, markerKey, marker);

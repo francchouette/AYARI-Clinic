@@ -16,7 +16,7 @@ import shutil
 import struct
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
@@ -565,7 +565,18 @@ def main() -> int:
     parser.add_argument("--source-cache", type=Path, default=Path(".cache/BodyParts3D"))
     parser.add_argument("--output", type=Path, default=Path("assets/anatomy/ayari_human_anatomy.glb"))
     parser.add_argument("--report", type=Path, default=Path("assets/anatomy/model_report.json"))
+    parser.add_argument(
+        "--triangle-scale",
+        type=float,
+        default=1.0,
+        help="Multiply each component's mobile triangle target by this value.",
+    )
+    parser.add_argument("--max-triangles", type=int, default=50_000)
+    parser.add_argument("--profile-name", default="lod0-mobile")
     args = parser.parse_args()
+
+    if args.triangle_scale <= 0:
+        parser.error("--triangle-scale must be greater than zero")
 
     source = ensure_checkout(args.source_cache.resolve())
     names = read_name_map(source)
@@ -577,7 +588,11 @@ def main() -> int:
         ComponentSpec("skeleton", "骨格", tuple(skeleton_ids), 18_000, "bone", ("骨格", "骨")),
         ComponentSpec("brain", "脳", tuple(brain_ids), 3_500, "brain", ("脳",)),
     )
-    specs = [FIXED_COMPONENTS[0], *dynamic_components, *FIXED_COMPONENTS[1:]]
+    base_specs = [FIXED_COMPONENTS[0], *dynamic_components, *FIXED_COMPONENTS[1:]]
+    specs = [
+        replace(spec, target_triangles=max(4, round(spec.target_triangles * args.triangle_scale)))
+        for spec in base_specs
+    ]
 
     all_ids = [fma_id for spec in specs for fma_id in spec.fma_ids]
     missing_ids = sorted(set(all_ids) - available)
@@ -598,6 +613,11 @@ def main() -> int:
         built.append((spec, mesh))
 
     report = build_glb(built, floor_mm, args.output.resolve())
+    report["profile"] = {
+        "name": args.profile_name,
+        "triangleScale": args.triangle_scale,
+        "maximumTriangles": args.max_triangles,
+    }
     report["sourceSelection"] = {
         "skeletonFmaIds": skeleton_ids,
         "brainFmaIds": brain_ids,
@@ -605,8 +625,11 @@ def main() -> int:
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    if report["triangles"] > 50_000:
-        raise RuntimeError(f"Triangle budget exceeded: {report['triangles']}")
+    if report["triangles"] > args.max_triangles:
+        raise RuntimeError(
+            f"Triangle budget exceeded for {args.profile_name}: "
+            f"{report['triangles']} > {args.max_triangles}"
+        )
     print(json.dumps({"triangles": report["triangles"], "vertices": report["vertices"], "asset": report["asset"]}))
     return 0
 

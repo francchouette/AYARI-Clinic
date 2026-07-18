@@ -2,28 +2,23 @@
 
 ![AYARI anatomy preview](assets/anatomy/preview.png)
 
-AYARI Clinicのデータ可視化向けに軽量化した、成人男性の全身解剖モデルです。骨格・脳・主要臓器は同一のBodyParts3D全身座標から生成しているため、部位を個別に目測配置したモデルではありません。
+AYARI Clinicのデータ可視化向けに3段階のLODを用意した、成人男性の全身解剖モデルです。骨格・脳・主要臓器は同一のBodyParts3D全身座標から生成しているため、部位を個別に目測配置したモデルではありません。
 
 ## 納品アセット
 
-- [`assets/anatomy/ayari_human_anatomy.glb`](assets/anatomy/ayari_human_anatomy.glb) — glTF 2.0 binary（GLB）
-- [`assets/anatomy/model_report.json`](assets/anatomy/model_report.json) — ポリゴン数、各部位の境界、FMA ID、Locator座標
+- [`assets/anatomy/ayari_human_anatomy.glb`](assets/anatomy/ayari_human_anatomy.glb) — LOD2高精細版、既定モデル
+- [`assets/anatomy/ayari_human_anatomy_lod1_standard.glb`](assets/anatomy/ayari_human_anatomy_lod1_standard.glb) — LOD1標準版
+- [`assets/anatomy/ayari_human_anatomy_lod0_mobile.glb`](assets/anatomy/ayari_human_anatomy_lod0_mobile.glb) — LOD0モバイル版
+- `model_report*.json` — 各LODのポリゴン数、部位境界、FMA ID、Locator座標
 - [`assets/anatomy/preview.png`](assets/anatomy/preview.png) — 正面・右側面のQAプレビュー
 
-| 項目 | 仕様 |
-|---|---|
-| フォーマット | glTF 2.0 binary（`.glb`） |
-| 三角形 | 42,331（上限50,000） |
-| 頂点 | 21,554 |
-| メッシュ | 20（皮膚、骨格、脳、主要臓器） |
-| Locator | 25（ジオメトリを持たないNode） |
-| 単位 | メートル |
-| Up軸 | Y-up、右手系 |
-| 原点 | 身体正中線上の足元床面 |
-| 法線 | あり、単位ベクトル検証済み |
-| UV・テクスチャ | なし。単色PBRマテリアルを使用 |
-| リグ・アニメーション | なし。静止モデル＋カメラ回転向け |
-| ファイルサイズ | 約1.1 MB |
+| LOD | 想定用途 | 三角形 | 頂点 | サイズ |
+|---|---|---:|---:|---:|
+| LOD2 High（既定） | 診察室LED、大画面、PC | 229,319 | 114,423 | 約5.3 MB |
+| LOD1 Standard | タブレット、高性能スマートフォン | 91,483 | 45,985 | 約2.2 MB |
+| LOD0 Mobile | 一般スマートフォン、通信量優先 | 42,331 | 21,554 | 約1.1 MB |
+
+全LOD共通で、glTF 2.0 binary、20メッシュ、25 Locator、メートル単位、Y-up右手系、足元床面原点です。単位法線を持ち、UV・テクスチャ、リグ、アニメーションは含みません。
 
 BodyParts3Dの元座標はmm単位、Zが頭側です。ビルド時に `X → X`、`Z → Y`、`Y → Z` としてメートルへ変換しています。モデルの外形は約1.65 mです。
 
@@ -62,7 +57,7 @@ LocatorはglTFの空Nodeで、`mesh`を持ちません。各Nodeの`extras`に�
 
 ## Three.jsでの利用
 
-[`examples/threejs/load-anatomy.js`](examples/threejs/load-anatomy.js) はLocatorの収集と、金色発光マーカーの追従例です。
+[`examples/threejs/load-anatomy.js`](examples/threejs/load-anatomy.js) はLOD選択、Locatorの収集、金色発光マーカーの追従例です。
 
 ```js
 loader.load('/assets/anatomy/ayari_human_anatomy.glb', ({ scene }) => {
@@ -80,10 +75,12 @@ Python 3.12を想定しています。
 
 ```bash
 python -m pip install -r requirements.txt
-python tools/build_anatomy_glb.py
+python tools/build_anatomy_glb.py \
+  --triangle-scale 6 --max-triangles 300000 --profile-name lod2-high
 python tools/validate_anatomy_glb.py \
   assets/anatomy/ayari_human_anatomy.glb \
-  --report assets/anatomy/model_report.json
+  --report assets/anatomy/model_report.json \
+  --max-triangles 300000
 ```
 
 ビルダーはBodyParts3Dの固定コミットから必要なSTLだけを部分取得し、208骨部位、31脳領域、主要臓器を統合・軽量化します。生成物はKhronos glTF Validatorでもエラー・警告ともに0件です。
@@ -92,7 +89,7 @@ python tools/validate_anatomy_glb.py \
 
 形状と相対位置は、DBCLSのBodyParts3D release 3.0（成人男性1例の全身解剖アトラス）を基準としています。これは一般的な解剖位置の説明、検査値や老化指標の臓器別マッピング、患者向け可視化を想定したリファレンスモデルです。
 
-個人差、性差、病変、臓器変形を表す患者固有モデルではありません。また、50,000三角形以下へ軽量化しているため、診断、手術計画、寸法計測、医療機器の判断根拠には使用できません。医療用途へ拡張する場合は、放射線科医・解剖学専門家によるレビューと、用途別の検証が別途必要です。
+個人差、性差、病変、臓器変形を表す患者固有モデルではありません。高精細版を含め、診断、手術計画、寸法計測、医療機器の判断根拠には使用できません。医療用途へ拡張する場合は、放射線科医・解剖学専門家によるレビューと、用途別の検証が別途必要です。
 
 ## 出典・ライセンス
 
