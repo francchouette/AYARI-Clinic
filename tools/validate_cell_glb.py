@@ -69,6 +69,8 @@ def main() -> int:
     assert document["asset"]["extras"]["units"] == "metres"
     assert document["asset"]["extras"]["upAxis"] == "Y"
     assert document["asset"]["extras"]["origin"] == "cell centre"
+    assert document["asset"]["extras"]["sourceDataset"] == "jrc_hela-2"
+    assert document["asset"]["extras"]["sourceLicense"] == "CC BY 4.0"
     assert document["scenes"][document["scene"]]["nodes"] == [0]
     assert document["nodes"][0]["name"] == "AYARI_Cell_Cutaway"
     assert document["nodes"][1]["name"] == "GEOMETRY"
@@ -79,6 +81,11 @@ def main() -> int:
         assert names[name]["extras"]["labelJa"] == label_ja
         assert names[name]["extras"]["markerKey"] == marker_key
 
+    assert names["GEO_cell"]["extras"]["measured"] is False
+    assert names["GEO_nucleus"]["extras"]["measured"] is True
+    assert names["GEO_nucleus"]["extras"]["sourceDataset"] == "jrc_hela-2"
+    assert len(document["meshes"][names["GEO_nucleus"]["mesh"]]["primitives"]) == 2
+
     mitochondria = [names[f"GEO_mitochondria_{index:02d}"] for index in range(1, 8)]
     chromosomes = [names[f"GEO_chromosome_{index:02d}"] for index in range(1, 5)]
     telomeres = [names[f"GEO_telomere_{index:02d}"] for index in range(1, 17)]
@@ -86,13 +93,19 @@ def main() -> int:
         assert node["extras"]["labelJa"] == "ミトコンドリア"
         assert node["extras"]["markerKey"] == "mito"
         assert node["extras"]["cristaeIncluded"] is True
+        assert node["extras"]["measured"] is True
+        assert node["extras"]["sourceDataset"] == "jrc_hela-2"
+        assert isinstance(node["extras"]["sourceInstanceId"], int)
         assert len(document["meshes"][node["mesh"]]["primitives"]) == 2
     for node in chromosomes:
         assert node["extras"]["labelJa"] == "染色体"
         assert node["extras"]["markerKey"] == "telo"
+        assert node["extras"]["measured"] is False
+        assert node["extras"]["geometryProvenance"] == "educational overlay"
     for node in telomeres:
         assert node["extras"]["labelJa"] == "テロメア"
         assert node["extras"]["markerKey"] == "telo"
+        assert node["extras"]["measured"] is False
 
     # Four protective caps must map to each chromosome.
     for chromosome_index in range(1, 5):
@@ -104,6 +117,7 @@ def main() -> int:
     assert len(dna_mesh["primitives"]) == 3  # strand A, strand B, base-pair rungs
     assert names["GEO_dna"]["extras"]["turns"] == 2.2
     assert names["GEO_dna"]["extras"]["basePairRungs"] == 24
+    assert names["GEO_dna"]["extras"]["measured"] is False
 
     # All transforms are intentionally baked; geometry nodes carry no TRS or matrix.
     for node in document["nodes"]:
@@ -111,6 +125,8 @@ def main() -> int:
 
     triangles = triangle_count(document)
     assert triangles == report["triangles"]
+    assert report["sourceData"]["dataset"] == "jrc_hela-2"
+    assert report["sourceData"]["license"] == "CC BY 4.0"
     assert 50_000 <= triangles <= 150_000, triangles
     file_size = args.asset.stat().st_size
     assert file_size == report["fileSizeBytes"]

@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Procedurally build the AYARI medical-luxury cutaway cell GLB.
+"""Build the AYARI reference-driven medical-luxury cutaway cell GLB.
 
-The generated asset is self-contained glTF 2.0 Binary with metre-scale,
-Y-up geometry. All transforms are baked into vertex positions so viewer-side
-selection, framing, and emissive highlighting can work directly on named
-submeshes.
+The nucleus and mitochondrial morphologies are extracted from measured
+OpenOrganelle ``jrc_hela-2`` FIB-SEM segmentation labels.  The display cell
+envelope and chromosome/telomere/DNA teaching overlays remain intentionally
+modelled.  Per-node extras make that distinction machine-readable.
+
+The generated asset is self-contained glTF 2.0 Binary with metre-scale Y-up
+geometry. All transforms are baked into vertex positions so viewer-side
+selection, framing, and emissive highlighting work on named submeshes.
 """
 
 from __future__ import annotations
@@ -20,6 +24,9 @@ from typing import Iterable, Sequence
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from scipy import ndimage
+from skimage import measure
+import trimesh
 
 
 ARRAY_BUFFER = 34962
@@ -60,6 +67,16 @@ def clean_geometry(vertices: np.ndarray, faces: np.ndarray) -> Geometry:
     normals = np.zeros_like(vertices)
     for corner in range(3):
         np.add.at(normals, faces[:, corner], face_normals)
+    normal_lengths = np.linalg.norm(normals, axis=1)
+    weak = normal_lengths < 1e-7
+    if np.any(weak):
+        # Non-manifold measured membrane sheets can cancel adjacent face
+        # normals at a small number of shared vertices.  A stable radial
+        # fallback keeps glTF NORMAL accessors valid and deterministic.
+        fallback = vertices[weak] - vertices.mean(axis=0)
+        fallback_lengths = np.linalg.norm(fallback, axis=1)
+        fallback[fallback_lengths < 1e-9] = (0.0, 1.0, 0.0)
+        normals[weak] = fallback
     normals = normalize(normals)
     return Geometry(
         vertices.astype(np.float32),
@@ -379,6 +396,109 @@ def dna_helix(
     return geometry_a, geometry_b, concatenate(rungs)
 
 
+OPENORGANELLE_DOI = "https://doi.org/10.25378/janelia.13108343"
+OPENORGANELLE_DATASET = "jrc_hela-2"
+MEASURED_SPACING_ZYX_NM = np.array((83.84, 64.0, 64.0), dtype=float)
+
+
+def load_measured_volume(cache_dir: Path, label: str) -> tuple[np.ndarray, dict]:
+    path = cache_dir / f"{label}_s4.npz"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Missing measured label cache {path}. Run "
+            "`python tools/fetch_openorganelle_cell.py` first."
+        )
+    with np.load(path, allow_pickle=False) as archive:
+        volume = archive["volume"]
+        provenance = json.loads(str(archive["provenance"].item()))
+    return volume, provenance
+
+
+def largest_component(mask: np.ndarray) -> np.ndarray:
+    labels, count = ndimage.label(mask, structure=ndimage.generate_binary_structure(3, 1))
+    if count == 0:
+        raise ValueError("Measured segmentation contains no connected component")
+    sizes = np.bincount(labels.reshape(-1))
+    sizes[0] = 0
+    return labels == int(np.argmax(sizes))
+
+
+def measured_surface(
+    mask: np.ndarray,
+    *,
+    target_faces: int,
+    spacing_zyx_nm: Sequence[float] = MEASURED_SPACING_ZYX_NM,
+    smooth_sigma: float = 0.62,
+) -> Geometry:
+    """Extract, smooth, and Web-optimize a measured binary label surface."""
+    occupied = np.argwhere(mask)
+    if not len(occupied):
+        raise ValueError("Cannot mesh an empty measured label")
+    lower = np.maximum(occupied.min(axis=0) - 3, 0)
+    upper = np.minimum(occupied.max(axis=0) + 4, np.asarray(mask.shape))
+    slices = tuple(slice(int(a), int(b)) for a, b in zip(lower, upper))
+    field = ndimage.gaussian_filter(mask[slices].astype(np.float32), sigma=smooth_sigma)
+    field = np.pad(field, 1, mode="constant")
+    vertices_zyx, faces, _normals, _values = measure.marching_cubes(
+        field,
+        level=0.45,
+        spacing=tuple(float(value) for value in spacing_zyx_nm),
+        allow_degenerate=False,
+    )
+    vertices_zyx += (lower - 1) * np.asarray(spacing_zyx_nm)
+    vertices_xyz = vertices_zyx[:, (2, 1, 0)]
+    mesh = trimesh.Trimesh(vertices=vertices_xyz, faces=faces, process=True, validate=True)
+    if len(mesh.faces) > target_faces:
+        mesh = mesh.simplify_quadric_decimation(face_count=target_faces, aggression=9)
+    return clean_geometry(np.asarray(mesh.vertices), np.asarray(mesh.faces))
+
+
+def measured_principal_transform(
+    geometries: Sequence[Geometry],
+    reference: Geometry,
+    *,
+    target_length: float,
+    translation: Sequence[float],
+    rotation: np.ndarray,
+) -> list[Geometry]:
+    """Apply one PCA frame/scale to related measured surfaces."""
+    reference_vertices = np.asarray(reference.vertices, dtype=float)
+    centre = (reference_vertices.min(axis=0) + reference_vertices.max(axis=0)) * 0.5
+    covariance = np.cov(reference_vertices - centre, rowvar=False)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    basis = eigenvectors[:, np.argsort(eigenvalues)[::-1]]
+    # Keep a right-handed local frame so outward winding survives the transform.
+    if np.linalg.det(basis) < 0:
+        basis[:, -1] *= -1
+    local_reference = (reference_vertices - centre) @ basis
+    scale = target_length / float(np.ptp(local_reference[:, 0]))
+    transformed: list[Geometry] = []
+    for geometry in geometries:
+        local = (np.asarray(geometry.vertices, dtype=float) - centre) @ basis
+        vertices = (local * scale) @ rotation.T + np.asarray(translation, dtype=float)
+        transformed.append(clean_geometry(vertices, geometry.faces))
+    return transformed
+
+
+def measured_nucleus_transform(
+    geometries: Sequence[Geometry],
+    reference: Geometry,
+    *,
+    translation: Sequence[float] = (-0.35, 0.02, -0.14),
+    target_extents: Sequence[float] = (0.60, 0.54, 0.52),
+) -> list[Geometry]:
+    reference_vertices = np.asarray(reference.vertices, dtype=float)
+    minimum = reference_vertices.min(axis=0)
+    maximum = reference_vertices.max(axis=0)
+    centre = (minimum + maximum) * 0.5
+    scale = np.asarray(target_extents, dtype=float) / np.maximum(maximum - minimum, 1e-9)
+    transformed: list[Geometry] = []
+    for geometry in geometries:
+        vertices = (np.asarray(geometry.vertices, dtype=float) - centre) * scale + np.asarray(translation)
+        transformed.append(clean_geometry(vertices, geometry.faces))
+    return transformed
+
+
 def material(
     name: str,
     colour: Sequence[float],
@@ -437,6 +557,10 @@ class GLBBuilder:
                     "origin": "cell centre",
                     "style": "medical-luxury cutaway",
                     "backgroundAndLightsBaked": False,
+                    "geometryMethod": "reference-driven hybrid",
+                    "measuredDataset": OPENORGANELLE_DATASET,
+                    "measuredSourceDoi": OPENORGANELLE_DOI,
+                    "measuredSourceLicense": "CC BY 4.0",
                 },
             },
             {"name": "GEOMETRY", "children": []},
@@ -511,6 +635,8 @@ class GLBBuilder:
                 "name": name,
                 "labelJa": extras["labelJa"],
                 "markerKey": extras["markerKey"],
+                "measured": extras.get("measured", False),
+                "geometryProvenance": extras.get("geometryProvenance", "unspecified"),
                 "vertices": int(sum(len(geometry.vertices) for geometry, _ in primitive_specs)),
                 "triangles": int(sum(len(geometry.faces) for geometry, _ in primitive_specs)),
                 "boundsMetres": {
@@ -525,14 +651,20 @@ class GLBBuilder:
         gltf = {
             "asset": {
                 "version": "2.0",
-                "generator": "AYARI Clinic procedural cell builder 1.0",
+                "generator": "AYARI Clinic OpenOrganelle cell builder 2.0",
                 "copyright": "Copyright AYARI Clinic",
                 "extras": {
                     "units": "metres",
                     "upAxis": "Y",
                     "origin": "cell centre",
                     "intendedUse": "Web visualisation and viewer-side biomarker highlighting",
-                    "medicalUse": "Stylised educational visual; not a diagnostic or surgical-planning device.",
+                    "medicalUse": "Reference-driven educational visual; not a diagnostic or surgical-planning device.",
+                    "sourceDataset": OPENORGANELLE_DATASET,
+                    "sourceDoi": OPENORGANELLE_DOI,
+                    "sourceLicense": "CC BY 4.0",
+                    "sourceVoxelResolutionNm": [4.0, 4.0, 5.24],
+                    "meshSamplingResolutionNmXYZ": [64.0, 64.0, 83.84],
+                    "provenancePolicy": "Each node declares measured or educational-overlay geometry in extras.",
                 },
             },
             "extensionsUsed": [
@@ -650,6 +782,12 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("assets/cell/ayari_cell_cutaway.glb"))
     parser.add_argument("--report", type=Path, default=Path("assets/cell/model_report.json"))
     parser.add_argument("--preview", type=Path, default=Path("assets/cell/preview.png"))
+    parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=Path(".cache/openorganelle/jrc_hela-2"),
+        help="Directory produced by fetch_openorganelle_cell.py",
+    )
     args = parser.parse_args()
 
     materials = [
@@ -662,21 +800,53 @@ def main() -> int:
         material("MAT_dna_strand_a", (0.88, 0.89, 0.85, 1.0), 0.13, 0.22, ior=1.47),
         material("MAT_dna_strand_b", (0.71, 0.79, 0.80, 1.0), 0.10, 0.24, ior=1.44),
         material("MAT_dna_base_pairs", (0.82, 0.70, 0.49, 0.96), 0.18, 0.24, ior=1.48),
+        material("MAT_measured_chromatin", (0.67, 0.60, 0.55, 0.30), 0.06, 0.34, transmission=0.35, ior=1.42, thickness=0.018, attenuation=(0.77, 0.72, 0.68)),
     ]
     builder = GLBBuilder()
 
-    cell = cutaway_shell()
+    cell = cutaway_shell(around=144, vertical=76)
     builder.add_node(
         "GEO_cell",
         ((cell, 0),),
-        {"labelJa": "細胞", "markerKey": "cell", "category": "cell membrane", "cutaway": True},
+        {
+            "labelJa": "細胞",
+            "markerKey": "cell",
+            "category": "cell membrane",
+            "cutaway": True,
+            "geometryProvenance": "modelled display envelope",
+            "measured": False,
+            "referenceDataset": OPENORGANELLE_DATASET,
+            "representationNote": "Envelope is a display-space cutaway; measured morphology is used for the nucleus and mitochondria.",
+        },
     )
 
-    nucleus = uv_sphere((-0.35, 0.02, -0.14), (0.30, 0.29, 0.27), around=72, vertical=48)
+    nucleus_volume, nucleus_provenance = load_measured_volume(args.cache_dir, "nucleus_seg")
+    chromatin_volume, chromatin_provenance = load_measured_volume(args.cache_dir, "chrom_seg")
+    nucleus_mask = largest_component(nucleus_volume > 0)
+    chromatin_mask = (chromatin_volume > 0) & ndimage.binary_dilation(nucleus_mask, iterations=2)
+    nucleus_measured = measured_surface(nucleus_mask, target_faces=10_000, smooth_sigma=0.72)
+    chromatin_measured = measured_surface(chromatin_mask, target_faces=5_500, smooth_sigma=0.58)
+    nucleus, chromatin = measured_nucleus_transform(
+        (nucleus_measured, chromatin_measured), nucleus_measured
+    )
     builder.add_node(
         "GEO_nucleus",
-        ((nucleus, 1),),
-        {"labelJa": "核", "markerKey": "cell", "category": "nucleus", "translucent": True},
+        ((nucleus, 1), (chromatin, 9)),
+        {
+            "labelJa": "核",
+            "markerKey": "cell",
+            "category": "nucleus",
+            "translucent": True,
+            "measured": True,
+            "geometryProvenance": "FIB-SEM segmentation surface",
+            "sourceDataset": OPENORGANELLE_DATASET,
+            "sourceDoi": OPENORGANELLE_DOI,
+            "sourceLabels": [nucleus_provenance["label"], chromatin_provenance["label"]],
+            "sourceScale": "s4",
+            "sourceSamplingNmXYZ": [64.0, 64.0, 83.84],
+            "displayTransform": "non-uniformly normalized to requested 0.60 m nucleus extent",
+            "chromatinPrimitiveIncluded": True,
+        },
     )
 
     chromosome_configs = (
@@ -697,6 +867,9 @@ def main() -> int:
                 "markerKey": "telo",
                 "category": "chromosome",
                 "chromosomeIndex": chromosome_index,
+                "measured": False,
+                "geometryProvenance": "educational overlay",
+                "biologyNote": "Condensed X-shape is a teaching symbol and is not measured in this interphase HeLa dataset.",
             },
         )
         for arm_index, endpoint in enumerate(endpoints, start=1):
@@ -710,23 +883,39 @@ def main() -> int:
                     "category": "telomere",
                     "chromosomeIndex": chromosome_index,
                     "armTip": arm_index,
+                    "measured": False,
+                    "geometryProvenance": "educational overlay",
                 },
             )
             telomere_index += 1
 
+    mito_volume, mito_provenance = load_measured_volume(args.cache_dir, "mito_seg")
+    mito_membrane_volume, mito_membrane_provenance = load_measured_volume(args.cache_dir, "mito-mem_seg")
+    # Seven sizeable, well-resolved source instances.  Each outer body and its
+    # membrane/cristae label receives exactly the same display transform.
     mito_configs = (
-        ((-0.59, 0.57, -0.12), 0.72, 0.25, 0.21, 0.065, (0.02, -0.10, -0.12)),
-        ((0.18, 0.64, -0.16), 0.70, 0.24, 0.20, 0.060, (0.08, 0.15, 0.28)),
-        ((-0.72, 0.12, -0.10), 0.66, 0.24, 0.20, 0.058, (-0.12, 0.10, 1.24)),
-        ((-0.57, -0.52, -0.14), 0.70, 0.25, 0.21, 0.065, (0.06, -0.12, -0.26)),
-        ((0.03, -0.68, -0.10), 0.76, 0.25, 0.21, 0.070, (-0.05, 0.08, 0.12)),
-        ((0.48, -0.38, -0.11), 0.68, 0.24, 0.20, 0.060, (0.10, -0.08, 0.77)),
-        ((0.35, 0.22, -0.26), 0.67, 0.23, 0.19, 0.056, (-0.08, 0.12, -0.72)),
+        (109, (-0.59, 0.57, -0.12), 0.72, (0.02, -0.10, -0.12)),
+        (351, (0.18, 0.64, -0.16), 0.70, (0.08, 0.15, 0.28)),
+        (253, (-0.72, 0.12, -0.10), 0.66, (-0.12, 0.10, 1.24)),
+        (99, (-0.57, -0.52, -0.14), 0.70, (0.06, -0.12, -0.26)),
+        (385, (0.03, -0.68, -0.10), 0.76, (-0.05, 0.08, 0.12)),
+        (277, (0.48, -0.38, -0.11), 0.68, (0.10, -0.08, 0.77)),
+        (169, (0.35, 0.22, -0.26), 0.67, (-0.08, 0.12, -0.72)),
     )
-    for index, (centre, length, width, depth, bend, angles) in enumerate(mito_configs, start=1):
-        rotation = rotation_matrix(*angles)
-        body = bean_body(centre, length, width, depth, bend, rotation)
-        cristae = cristae_bundle(centre, length, width, depth, bend, rotation)
+    for index, (source_instance, centre, length, angles) in enumerate(mito_configs, start=1):
+        body_measured = measured_surface(
+            mito_volume == source_instance, target_faces=3_500, smooth_sigma=0.54
+        )
+        membrane_measured = measured_surface(
+            mito_membrane_volume == source_instance, target_faces=1_800, smooth_sigma=0.44
+        )
+        body, cristae = measured_principal_transform(
+            (body_measured, membrane_measured),
+            body_measured,
+            target_length=length,
+            translation=centre,
+            rotation=rotation_matrix(*angles),
+        )
         builder.add_node(
             f"GEO_mitochondria_{index:02d}",
             ((body, 4), (cristae, 5)),
@@ -736,6 +925,16 @@ def main() -> int:
                 "category": "mitochondrion",
                 "instance": index,
                 "cristaeIncluded": True,
+                "measured": True,
+                "geometryProvenance": "FIB-SEM segmentation surfaces",
+                "sourceDataset": OPENORGANELLE_DATASET,
+                "sourceDoi": OPENORGANELLE_DOI,
+                "sourceOuterLabel": mito_provenance["label"],
+                "sourceMembraneLabel": mito_membrane_provenance["label"],
+                "sourceInstanceId": source_instance,
+                "sourceScale": "s4",
+                "sourceSamplingNmXYZ": [64.0, 64.0, 83.84],
+                "displayTransform": "PCA-aligned, uniformly scaled, and compositionally repositioned",
             },
         )
 
@@ -750,11 +949,20 @@ def main() -> int:
             "turns": 2.2,
             "basePairRungs": 24,
             "placement": "right-front of nucleus",
+            "measured": False,
+            "geometryProvenance": "educational molecular-scale overlay",
+            "scaleNote": "DNA is intentionally enlarged and is not at the same physical scale as the cell surface.",
         },
     )
 
     builder.write(args.output, materials)
-    draw_preview(args.preview)
+    from render_cell_preview import render as render_cell_preview
+
+    render_cell_preview(
+        args.output,
+        args.preview,
+        triangles=int(sum(node["triangles"] for node in builder.report_nodes)),
+    )
 
     all_min = np.min([node["boundsMetres"]["min"] for node in builder.report_nodes], axis=0)
     all_max = np.max([node["boundsMetres"]["max"] for node in builder.report_nodes], axis=0)
@@ -778,7 +986,20 @@ def main() -> int:
             "dna": ["GEO_dna"],
         },
         "sceneContent": {"background": False, "lights": False, "cameras": False, "animations": False, "skins": False},
-        "medicalUse": "Stylised educational visualisation; not validated for diagnosis or surgical planning.",
+        "sourceData": {
+            "dataset": OPENORGANELLE_DATASET,
+            "sample": "wild-type interphase HeLa cell (ATCC CCL-2)",
+            "modality": "isotropic FIB-SEM",
+            "doi": OPENORGANELLE_DOI,
+            "license": "CC BY 4.0",
+            "nativeVoxelResolutionNmXYZ": [4.0, 4.0, 5.24],
+            "meshSamplingResolutionNmXYZ": [64.0, 64.0, 83.84],
+            "measuredNodes": ["GEO_nucleus"] + [f"GEO_mitochondria_{index:02d}" for index in range(1, 8)],
+            "modelledNodes": ["GEO_cell"] + [f"GEO_chromosome_{index:02d}" for index in range(1, 5)] + [f"GEO_telomere_{index:02d}" for index in range(1, 17)] + ["GEO_dna"],
+            "displayNormalization": "Measured surfaces are normalized and compositionally repositioned to satisfy the requested 2 m display-space layout.",
+        },
+        "scientificScope": "Measured cell-organelle morphology with clearly identified educational overlays; not a single-scale literal reconstruction.",
+        "medicalUse": "Reference-driven educational visualisation; not validated for diagnosis or surgical planning.",
     }
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

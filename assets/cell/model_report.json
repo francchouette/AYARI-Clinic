@@ -7,8 +7,8 @@
     "origin": "cell centre",
     "transformsApplied": true
   },
-  "triangles": 107748,
-  "vertices": 54246,
+  "triangles": 114414,
+  "vertices": 59544,
   "meshes": 30,
   "nodes": 32,
   "materials": [
@@ -20,38 +20,41 @@
     "MAT_cristae",
     "MAT_dna_strand_a",
     "MAT_dna_strand_b",
-    "MAT_dna_base_pairs"
+    "MAT_dna_base_pairs",
+    "MAT_measured_chromatin"
   ],
   "boundsMetres": {
     "min": [
-      -0.9998058080673218,
+      -0.9996938705444336,
       -0.9200000166893005,
-      -0.8597776293754578
+      -0.8597097396850586
     ],
     "max": [
-      0.9998058080673218,
+      0.9996938705444336,
       0.9200000166893005,
-      0.5054129362106323
+      0.5053844451904297
     ]
   },
-  "fileSizeBytes": 2637556,
+  "fileSizeBytes": 2856832,
   "components": [
     {
       "name": "GEO_cell",
       "labelJa": "細胞",
       "markerKey": "cell",
-      "vertices": 28160,
-      "triangles": 56316,
+      "measured": false,
+      "geometryProvenance": "modelled display envelope",
+      "vertices": 21888,
+      "triangles": 43772,
       "boundsMetres": {
         "min": [
-          -0.9998058080673218,
+          -0.9996938705444336,
           -0.9200000166893005,
-          -0.8597776293754578
+          -0.8597097396850586
         ],
         "max": [
-          0.9998058080673218,
+          0.9996938705444336,
           0.9200000166893005,
-          0.5054129362106323
+          0.5053844451904297
         ]
       }
     },
@@ -59,18 +62,20 @@
       "name": "GEO_nucleus",
       "labelJa": "核",
       "markerKey": "cell",
-      "vertices": 3386,
-      "triangles": 6768,
+      "measured": true,
+      "geometryProvenance": "FIB-SEM segmentation surface",
+      "vertices": 6928,
+      "triangles": 15478,
       "boundsMetres": {
         "min": [
           -0.6499999761581421,
-          -0.27000001072883606,
-          -0.4099999964237213
+          -0.25,
+          -0.4000000059604645
         ],
         "max": [
           -0.05000000074505806,
-          0.3100000023841858,
-          0.12999999523162842
+          0.28999999165534973,
+          0.11999999731779099
         ]
       }
     },
@@ -78,6 +83,8 @@
       "name": "GEO_chromosome_01",
       "labelJa": "染色体",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 702,
       "triangles": 1304,
       "boundsMetres": {
@@ -97,6 +104,8 @@
       "name": "GEO_telomere_01",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -116,6 +125,8 @@
       "name": "GEO_telomere_02",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -135,6 +146,8 @@
       "name": "GEO_telomere_03",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -154,6 +167,8 @@
       "name": "GEO_telomere_04",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -173,6 +188,8 @@
       "name": "GEO_chromosome_02",
       "labelJa": "染色体",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 702,
       "triangles": 1304,
       "boundsMetres": {
@@ -192,6 +209,8 @@
       "name": "GEO_telomere_05",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -211,6 +230,8 @@
       "name": "GEO_telomere_06",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -230,6 +251,8 @@
       "name": "GEO_telomere_07",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -249,6 +272,8 @@
       "name": "GEO_telomere_08",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -268,6 +293,8 @@
       "name": "GEO_chromosome_03",
       "labelJa": "染色体",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 702,
       "triangles": 1304,
       "boundsMetres": {
@@ -287,6 +314,8 @@
       "name": "GEO_telomere_09",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -306,6 +335,8 @@
       "name": "GEO_telomere_10",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -325,6 +356,8 @@
       "name": "GEO_telomere_11",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -344,6 +377,8 @@
       "name": "GEO_telomere_12",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -363,6 +398,8 @@
       "name": "GEO_chromosome_04",
       "labelJa": "染色体",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 702,
       "triangles": 1304,
       "boundsMetres": {
@@ -382,6 +419,8 @@
       "name": "GEO_telomere_13",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -401,6 +440,8 @@
       "name": "GEO_telomere_14",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -420,6 +461,8 @@
       "name": "GEO_telomere_15",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -439,6 +482,8 @@
       "name": "GEO_telomere_16",
       "labelJa": "テロメア",
       "markerKey": "telo",
+      "measured": false,
+      "geometryProvenance": "educational overlay",
       "vertices": 222,
       "triangles": 440,
       "boundsMetres": {
@@ -458,18 +503,20 @@
       "name": "GEO_mitochondria_01",
       "labelJa": "ミトコンドリア",
       "markerKey": "mito",
-      "vertices": 1912,
-      "triangles": 3800,
+      "measured": true,
+      "geometryProvenance": "FIB-SEM segmentation surfaces",
+      "vertices": 3188,
+      "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.9404327869415283,
-          0.4219163656234741,
-          -0.23066245019435883
+          -0.9550925493240356,
+          0.4680122137069702,
+          -0.19119881093502045
         ],
         "max": [
-          -0.22918164730072021,
-          0.6982372403144836,
-          -0.009840051643550396
+          -0.24154415726661682,
+          0.6931074857711792,
+          -0.06476914882659912
         ]
       }
     },
@@ -477,18 +524,20 @@
       "name": "GEO_mitochondria_02",
       "labelJa": "ミトコンドリア",
       "markerKey": "mito",
-      "vertices": 1912,
-      "triangles": 3800,
+      "measured": true,
+      "geometryProvenance": "FIB-SEM segmentation surfaces",
+      "vertices": 2896,
+      "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.16449639201164246,
-          0.48701396584510803,
-          -0.2724153995513916
+          -0.13411004841327667,
+          0.43147748708724976,
+          -0.29155224561691284
         ],
         "max": [
-          0.5034592747688293,
-          0.804590106010437,
-          -0.04866468161344528
+          0.5307751297950745,
+          0.7727547883987427,
+          -0.058650992810726166
         ]
       }
     },
@@ -496,18 +545,20 @@
       "name": "GEO_mitochondria_03",
       "labelJa": "ミトコンドリア",
       "markerKey": "mito",
-      "vertices": 1912,
-      "triangles": 3800,
+      "measured": true,
+      "geometryProvenance": "FIB-SEM segmentation surfaces",
+      "vertices": 3210,
+      "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.8919370770454407,
-          -0.1807919591665268,
-          -0.203599750995636
+          -0.931602954864502,
+          -0.1575547754764557,
+          -0.18328647315502167
         ],
         "max": [
-          -0.5643014907836914,
-          0.44476085901260376,
-          0.0065855663269758224
+          -0.5534629225730896,
+          0.4543837904930115,
+          0.025664757937192917
         ]
       }
     },
@@ -515,18 +566,20 @@
       "name": "GEO_mitochondria_04",
       "labelJa": "ミトコンドリア",
       "markerKey": "mito",
-      "vertices": 1912,
-      "triangles": 3800,
+      "measured": true,
+      "geometryProvenance": "FIB-SEM segmentation surfaces",
+      "vertices": 3058,
+      "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.8963318467140198,
-          -0.6768480539321899,
-          -0.2529909908771515
+          -0.9066993594169617,
+          -0.6411622762680054,
+          -0.18951381742954254
         ],
         "max": [
-          -0.2221117615699768,
-          -0.3560792803764343,
-          -0.02854735590517521
+          -0.2332531064748764,
+          -0.38769710063934326,
+          -0.022248459979891777
         ]
       }
     },
@@ -534,18 +587,20 @@
       "name": "GEO_mitochondria_05",
       "labelJa": "ミトコンドリア",
       "markerKey": "mito",
-      "vertices": 1912,
-      "triangles": 3800,
+      "measured": true,
+      "geometryProvenance": "FIB-SEM segmentation surfaces",
+      "vertices": 3110,
+      "triangles": 5300,
       "boundsMetres": {
         "min": [
-          -0.35192951560020447,
-          -0.8297192454338074,
-          -0.20784702897071838
+          -0.35385647416114807,
+          -0.757841944694519,
+          -0.1972060352563858
         ],
         "max": [
-          0.4001918137073517,
-          -0.5484192967414856,
-          0.00967948604375124
+          0.39672327041625977,
+          -0.5244841575622559,
+          -0.04025070369243622
         ]
       }
     },
@@ -553,18 +608,20 @@
       "name": "GEO_mitochondria_06",
       "labelJa": "ミトコンドリア",
       "markerKey": "mito",
-      "vertices": 1912,
-      "triangles": 3800,
+      "measured": true,
+      "geometryProvenance": "FIB-SEM segmentation surfaces",
+      "vertices": 2976,
+      "triangles": 5300,
       "boundsMetres": {
         "min": [
-          0.19773156940937042,
-          -0.6090140342712402,
-          -0.2150661200284958
+          0.1334700733423233,
+          -0.71210116147995,
+          -0.3055632412433624
         ],
         "max": [
-          0.714941680431366,
-          -0.10421261191368103,
-          -0.00808123778551817
+          0.8318876028060913,
+          -0.04880622774362564,
+          0.07614748179912567
         ]
       }
     },
@@ -572,18 +629,20 @@
       "name": "GEO_mitochondria_07",
       "labelJa": "ミトコンドリア",
       "markerKey": "mito",
-      "vertices": 1912,
-      "triangles": 3800,
+      "measured": true,
+      "geometryProvenance": "FIB-SEM segmentation surfaces",
+      "vertices": 2974,
+      "triangles": 5300,
       "boundsMetres": {
         "min": [
-          0.10958988964557648,
-          0.005064993631094694,
-          -0.3616986572742462
+          0.06932611763477325,
+          -0.04763124883174896,
+          -0.3927094638347626
         ],
         "max": [
-          0.6332284808158875,
-          0.4799557328224182,
-          -0.1566469967365265
+          0.6108664274215698,
+          0.48609820008277893,
+          -0.15911361575126648
         ]
       }
     },
@@ -591,6 +650,8 @@
       "name": "GEO_dna",
       "labelJa": "DNA",
       "markerKey": "dna",
+      "measured": false,
+      "geometryProvenance": "educational molecular-scale overlay",
       "vertices": 2956,
       "triangles": 5808,
       "boundsMetres": {
@@ -660,5 +721,58 @@
     "animations": false,
     "skins": false
   },
-  "medicalUse": "Stylised educational visualisation; not validated for diagnosis or surgical planning."
+  "sourceData": {
+    "dataset": "jrc_hela-2",
+    "sample": "wild-type interphase HeLa cell (ATCC CCL-2)",
+    "modality": "isotropic FIB-SEM",
+    "doi": "https://doi.org/10.25378/janelia.13108343",
+    "license": "CC BY 4.0",
+    "nativeVoxelResolutionNmXYZ": [
+      4.0,
+      4.0,
+      5.24
+    ],
+    "meshSamplingResolutionNmXYZ": [
+      64.0,
+      64.0,
+      83.84
+    ],
+    "measuredNodes": [
+      "GEO_nucleus",
+      "GEO_mitochondria_01",
+      "GEO_mitochondria_02",
+      "GEO_mitochondria_03",
+      "GEO_mitochondria_04",
+      "GEO_mitochondria_05",
+      "GEO_mitochondria_06",
+      "GEO_mitochondria_07"
+    ],
+    "modelledNodes": [
+      "GEO_cell",
+      "GEO_chromosome_01",
+      "GEO_chromosome_02",
+      "GEO_chromosome_03",
+      "GEO_chromosome_04",
+      "GEO_telomere_01",
+      "GEO_telomere_02",
+      "GEO_telomere_03",
+      "GEO_telomere_04",
+      "GEO_telomere_05",
+      "GEO_telomere_06",
+      "GEO_telomere_07",
+      "GEO_telomere_08",
+      "GEO_telomere_09",
+      "GEO_telomere_10",
+      "GEO_telomere_11",
+      "GEO_telomere_12",
+      "GEO_telomere_13",
+      "GEO_telomere_14",
+      "GEO_telomere_15",
+      "GEO_telomere_16",
+      "GEO_dna"
+    ],
+    "displayNormalization": "Measured surfaces are normalized and compositionally repositioned to satisfy the requested 2 m display-space layout."
+  },
+  "scientificScope": "Measured cell-organelle morphology with clearly identified educational overlays; not a single-scale literal reconstruction.",
+  "medicalUse": "Reference-driven educational visualisation; not validated for diagnosis or surgical planning."
 }

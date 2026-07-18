@@ -1,6 +1,6 @@
 # AYARI Clinic Human Anatomy GLB
 
-> 追加アセット: [`assets/cell/ayari_cell_cutaway.glb`](assets/cell/ayari_cell_cutaway.glb) — 指標別発光・ズーム対応の細胞カットアウェイモデル。仕様と実装例は [`assets/cell/README.md`](assets/cell/README.md) を参照してください。
+> 追加アセット: [`assets/cell/ayari_cell_cutaway.glb`](assets/cell/ayari_cell_cutaway.glb) — OpenOrganelle実測FIB-SEM形態を反映した、指標別発光・ズーム対応の細胞カットアウェイモデル。仕様・source provenance・実装例は [`assets/cell/README.md`](assets/cell/README.md) を参照してください。
 
 ![AYARI anatomy preview](assets/anatomy/preview.png)
 
