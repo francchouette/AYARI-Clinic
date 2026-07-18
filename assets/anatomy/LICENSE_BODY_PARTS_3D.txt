@@ -1,0 +1,19 @@
+Summary: Creative Commons License Creative Commons Attribution-Inheritance 2.1 Japan (CC BY-SA)
+
+Original: http://lifesciencedb.jp/bp3d/info_en/license/index.html
+
+Translation: https://creativecommons.org/licenses/by-sa/2.1/jp/deed.en
+
+About terms of use and credit description:
+The standard licenses for the contents (including images created by Anatomography)
+published on http://lifesciencedb.jp/bp3d and http://lifesciencedb.jp/ag are:
+
+Creative Commons License Creative Commons Attribution-Inheritance 2.1 Japan
+
+Required credit:
+
+BodyParts3D, Copyright (c) 2008 Life Science Integrated Database Center licensed
+by CC Attribution-Share Alike 2.1 Japan.
+
+This AYARI GLB is a simplified, coordinate-transformed derivative and is shared
+under the same CC BY-SA 2.1 Japan terms.
