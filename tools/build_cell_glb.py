@@ -173,7 +173,7 @@ def uv_sphere(
 
 
 def cutaway_shell(
-    outer_radii: Sequence[float] = (0.99, 0.95, 0.91),
+    outer_radii: Sequence[float] = (0.98, 0.94, 0.90),
     thickness: float = 0.035,
     gap_radians: float = math.radians(104),
     around: int = 144,
@@ -195,12 +195,28 @@ def cutaway_shell(
     vertices: list[list[float]] = []
 
     def organic_radius(latitude: float, longitude: float) -> float:
+        # Four broad, deliberately non-aligned lobes keep the membrane smooth
+        # while making the silhouette visibly cellular.  The combined field
+        # stays restrained (approximately -8% to +9%): enough to avoid the
+        # synthetic perfect-sphere read without becoming wavy or amoeboid.
         latitude_weight = math.cos(latitude) ** 2
+        screen_x = math.cos(latitude) * math.cos(longitude)
+        screen_y = math.sin(latitude)
+        screen_weight = screen_x**2 + screen_y**2
+        screen_angle = math.atan2(screen_y, screen_x)
         return (
             1.0
-            + 0.024 * math.sin(2.0 * longitude + 0.45) * latitude_weight
-            + 0.016 * math.cos(3.0 * latitude - 0.30)
-            + 0.011 * math.sin(longitude - 0.80) * math.sin(2.0 * latitude)
+            + 0.040 * math.sin(2.0 * longitude + 0.45) * latitude_weight
+            + 0.026 * math.cos(3.0 * latitude - 0.30)
+            + 0.022 * math.sin(longitude - 0.80) * math.sin(2.0 * latitude)
+            + 0.016
+            * math.cos(3.0 * longitude + 0.20)
+            * math.cos(latitude) ** 3
+            + screen_weight
+            * (
+                0.022 * math.sin(3.0 * screen_angle + 0.55)
+                + 0.009 * math.cos(2.0 * screen_angle - 0.35)
+            )
         )
 
     def surface(radii: np.ndarray) -> list[list[int]]:
